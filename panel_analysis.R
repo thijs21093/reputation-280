@@ -10,6 +10,10 @@ load(file="./Data/audiencecounts") # Data
 # ======================================================
 #           Pre-processing
 # ======================================================
+
+# ======================================================
+#           Pre-processing
+# ======================================================
 tibble <- bind_tweets(data_path = "to_agencies") %>% 
   as_tibble %>% # As tibble
   rename(tweet_id = id) # Code for creating tibble from JSON, see: https://cran.r-project.org/web/packages/academictwitteR/vignettes/academictwitteR-tidy.html

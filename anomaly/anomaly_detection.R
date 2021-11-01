@@ -3,9 +3,10 @@ library(tidyverse)
 library(anomalize)
 library(dplyr)
 library(ggplot2)
+library(ggthemes)
 
 # Load data
-load("./Data/audiencecounts")
+load("./data/audiencecounts")
 
 # Create dataframe
 for (i in seq(audiencecounts))
@@ -14,134 +15,92 @@ for (i in seq(audiencecounts))
 dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
 df <- do.call(rbind, mget(names(dfs)[dfs])) # Bind dataframes
 
-df <- df %>%
+df.month <- df %>%
   mutate(start = as.POSIXct(start),
          end = as.POSIXct(end)) %>% # Adjust time variables
-  group_by(agencyname) %>% # Group by agency
-  select(-agencyhandle) # Remove handle
+  filter(start >= "2015-07-01" & # Start date
+         start <= "2021-06-30") %>% # end date
+  group_by(agencyname, month = cut(start, "month"),  .drop = FALSE) %>%
+  summarise(count = sum(tweet_count), .groups = "keep") %>%
+  mutate(first_match = min(row_number()[count != 0])) %>% # Set count to NA when an agency has no Twitter
+  filter(row_number() >= first_match) %>%
+  mutate(month = as.POSIXct(month)) %>%
+ select(-c(first_match)) # Remove vars
+
+# TO DO: check warning
 
 # Plot time 
-df %>% ggplot(aes(x = start, y = tweet_count)) +
+df.month %>% ggplot(aes(x = month, y = count)) +
   facet_wrap(~agencyname,
-             ncol = 4,
+             ncol = 6,
              scales = "free") +
   geom_smooth(method = "lm",
               se = FALSE,
               size = 0.5) +
-  geom_point(size = 2) +
+  geom_point(size = 1) +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%Y") +
   theme_few() +
   theme(axis.ticks = element_blank(),
         axis.text = element_text(size = 10),
         axis.title = element_text(size = 15),
         strip.text = element_text(size = 10)) +
-  xlab("Time") + ylab("Count")
-
-# Set count to NA for which an agency has no Twitter
-
+  xlab("Time") + ylab("Count") + labs(title = "Audience tweets (07/15 - 06/21)")
 
 # Convert df to a tibble
-df <- as_tibble(df)
-class(df)
+df.t <- as_tibble(df.month) %>%
+  group_by(agencyname) # Create grouped tibble
 
-df_anomalized <- df %>%
-  time_decompose(overall, merge = TRUE) %>%
-  anomalize(remainder) %>%
+
+# ======================================================
+#           STL
+# ======================================================
+
+df.anomalized <- df.t %>%
+  time_decompose(count, merge = TRUE, method = "STL") %>% # STL is default
+  anomalize(remainder, method = "gesd") %>%
   anomalize::time_recompose()
 
-# Glimpse
-df_anomalized %>% glimpse()
+# TO DO: check warnings
 
 # Plot
-df_anomalized %>% plot_anomalies(ncol = 3, alpha_dots = 0.75)
+df.anomalized %>%
+  plot_anomalies(ncol = 5, alpha_dots = 0.25)
 
-# Adjusting Trend and Seasonality
-p1 <- df_anomalized %>%
-  plot_anomaly_decomposition() +
-  ggtitle("Freq/Trend = 'auto'")
-p1
+# Extracting the anomalous data points
+anomaly <- df.anomalized %>%
+  mutate(threat = case_when(
+    anomaly == "Yes" & remainder > 0 ~ "yes",
+    TRUE ~ "no"))
 
-# Adjusting local parameters
-p2 <- df %>%
-  time_decompose(overall,
-                 frequency = "auto",
-                 trend     = "2 weeks") %>%
-  anomalize(remainder) %>%
-  plot_anomaly_decomposition() +
-  ggtitle("Trend = 2 Weeks (Local)")
-p2
+# Distribution
+anomaly %>%
+  group_by(threat) %>%
+  dplyr::summarise(count = n()) %>%
+  mutate(prop = count / sum(count)) # Overview of distribution across sentiments
 
-# Adjusting the global parameter
-time_scale_template() %>%
-  mutate(trend = ifelse(time_scale == "day", "2 weeks", trend)) %>%
-  set_time_scale_template()
-get_time_scale_template() # View template
+# ======================================================
+#           Twitter decomposition
+# ======================================================
+df.anomalized.twitter <- df.t %>%
+  time_decompose(count, merge = TRUE, method = "twitter") %>%
+  anomalize(remainder, method = "gesd") %>% # Same as Erlich et al.
+  anomalize::time_recompose()
 
+# TO DO: check warnings
 
-p3 <- df %>%
-  time_decompose(overall) %>%
-  anomalize(remainder) %>%
-  plot_anomaly_decomposition() +
-  ggtitle("Trend = 2 Weeks (Global)")
-p3
+# Plot
+df.anomalized.twitter %>%
+  plot_anomalies(ncol = 5, alpha_dots = 0.25)
 
-time_scale_template() %>%
-  set_time_scale_template() # Reset template
-get_time_scale_template() # Verify the change
+# Extracting the anomalous data points
+anomaly.twitter <- df.anomalized.twitter %>%
+  mutate(threat = case_when(
+    anomaly == "Yes" & remainder > 0 ~ "yes",
+    TRUE ~ "no"))
 
-# Extracting the anomalous data Points
-df %>% 
-  time_decompose(overall) %>%
-  anomalize(remainder) %>%
-  time_recompose() %>%
-  filter(anomaly == 'Yes')
-
-## Adjusting alpha and max anoms
-
-# Alpha
-p4 <- df %>%
-  time_decompose(overall) %>%
-  anomalize(remainder, alpha = 0.05, max_anoms = 0.2) %>%
-  time_recompose() %>%
-  plot_anomalies(time_recomposed = TRUE) +
-  ggtitle("alpha = 0.05")
-#> frequency = 7 days
-#> trend = 91 days
-p4
-
-p5 <- df %>%
-  time_decompose(overall) %>%
-  anomalize(remainder, alpha = 0.025, max_anoms = 0.2) %>% # alpha = 0.025
-  time_recompose() %>%
-  plot_anomalies(time_recomposed = TRUE) +
-  ggtitle("alpha = 0.05")
-#> frequency = 7 days
-#> trend = 91 days
-p5
-
-
-# Max anomalies
-p6 <- df %>%
-  time_decompose(overall) %>%
-  anomalize(remainder, alpha = 0.3, max_anoms = 0.2) %>% # Note: percentages
-  time_recompose() %>%
-  plot_anomalies(time_recomposed = TRUE) +
-  ggtitle("20% Anomalies")
-p6
-#> frequency = 7 days
-#> trend = 91 days
-p7 <- df %>%
-  time_decompose(overall) %>%
-  anomalize(remainder, alpha = 0.3, max_anoms = 0.05) %>%
-  time_recompose() %>%
-  plot_anomalies(time_recomposed = TRUE) +
-  ggtitle("5% Anomalies")
-#> frequency = 7 days
-#> trend = 91 days
-p7
-
-##  ‘timetk’ package
-# Interactive anomaly visualization
-df %>% timetk::plot_anomaly_diagnostics(month,overall, .facet_ncol = 2)
-
-# Extraction
-df %>% timetk::tk_anomaly_diagnostics(month, overall) %>% filter(anomaly=='Yes')
+# Distribution
+anomaly.twitter %>%
+  group_by(threat) %>%
+  dplyr::summarise(count = n()) %>%
+  mutate(prop = count / sum(count)) # Overview of distribution across sentiments

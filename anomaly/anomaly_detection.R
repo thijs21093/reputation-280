@@ -6,6 +6,8 @@ library(ggplot2)
 
 # Load data
 load("./Data/audiencecounts")
+
+# Create dataframe
 for (i in seq(audiencecounts))
   assign(paste0("df", i), audiencecounts[[i]]) # Create seperate dataframes
 

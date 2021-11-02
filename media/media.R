@@ -4,6 +4,9 @@ library(purrr)
 library(tidytext)
 library(dplyr)
 library(stringr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
 
 # All 
 files.list <- list.files(full.names = TRUE) # List of paths
@@ -21,7 +24,8 @@ acer <- str_c(getwd(),
   map(Corpus, readerControl = list(language = NA)) %>% 
   map_dfr(tidy) %>% 
   mutate(date = as.POSIXct(datetimestamp),
-         acronym = "ACER")
+         acronym = "ACER",
+         infodesc = as.list(infodesc))
 
 # BEREC OFFICE
 berec <- str_c(getwd(), 
@@ -53,77 +57,249 @@ cedefop <- str_c(getwd(),
 ##  mutate(date = as.POSIXct(datetimestamp),
 ##         acronym = "CPVO")
 
-# INCORRECT: data needs not be dowloaded again
+# INCORRECT: data needs not be downloaded again
 
 # EASA
-easa <- str_c(getwd(), 
+corpus.easa <- str_c(getwd(), 
                  "/",
                  str_subset(files, "easa[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>%
+  map(tidy)
+  
+easa <- do.call(rbind.data.frame, corpus.easa) %>%
+mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EASA")
+
+# EBA
+eba <- str_c(getwd(), 
+              "/",
+              str_subset(files, "eba[:digit:]")) %>% # Path to htmls
   map(FactivaSource) %>% 
   map(Corpus, readerControl = list(language = NA)) %>% 
   map_dfr(tidy) %>% 
   mutate(date = as.POSIXct(datetimestamp),
-         acronym = "EASA")
+         acronym = "EBA")
 
-# EASO
-
-# EBA
-
-#ECDC
+# ECDC
+ecdc <- str_c(getwd(), 
+             "/",
+             str_subset(files, "ecdc[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "ECDC")
 
 # ECHA
+echa <- str_c(getwd(), 
+              "/",
+              str_subset(files, "echa[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "ECHA")
 
 # EEA
+eea <- str_c(getwd(), 
+              "/",
+              str_subset(files, "eea[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EEA")
 
 # EFCA
+efca <- str_c(getwd(), 
+             "/",
+             str_subset(files, "efca[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EFCA",
+         company = as.list(company))
 
 # EFSA
+corpus.efsa <- str_c(getwd(), 
+                     "/",
+                     str_subset(files, "efsa[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>%
+  map(tidy)
+
+efsa <- do.call(rbind.data.frame, corpus.efsa) %>%
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EFSA") 
 
 # EIGE
-
+eige <- str_c(getwd(), 
+              "/",
+              str_subset(files, "eige[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EIGE")
 # EIOPA
+eiopa <- str_c(getwd(), 
+              "/",
+              str_subset(files, "eiopa[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EIOPA")
 
 # EMA
+## ema <- str_c(getwd(), 
+##               "/",
+##               str_subset(files, "ema[:digit:]")) %>% # Path to htmls
+##  map(FactivaSource) %>% 
+##  map(Corpus, readerControl = list(language = NA)) %>% 
+##  map_dfr(tidy) %>% 
+##  mutate(date = as.POSIXct(datetimestamp),
+##         acronym = "EMA")
+
+# INCORRECT: data needs not be downloaded again
 
 # EMCDDA
-
+emcdda <- str_c(getwd(), 
+             "/",
+             str_subset(files, "emcdda[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EMCDDA")
 # EMSA
+emsa <- str_c(getwd(), 
+                "/",
+                str_subset(files, "emsa[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EMSA")
 
 # ENISA
+enisa <- str_c(getwd(), 
+              "/",
+              str_subset(files, "enisa[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "ENISA",
+         infodesc = as.list(infodesc))
 
 # ERA
+era <- str_c(getwd(), 
+               "/",
+               str_subset(files, "era[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "ERA",
+         industry = as.list(industry))
 
 # ESMA
+esma <- str_c(getwd(), 
+             "/",
+             str_subset(files, "esma[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "ESMA")
 
 # EUIPO
+euipo <- str_c(getwd(), 
+             "/",
+             str_subset(files, "euipo[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EUIPO")
 
 # EUROFOUND
+eurofound <- str_c(getwd(), 
+               "/",
+               str_subset(files, "eurofound[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EUROFOUND")
 
 # FRA
+corpus.fra <- str_c(getwd(), 
+                     "/",
+                     str_subset(files, "fra[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>%
+  map(tidy)
+
+fra <- do.call(rbind.data.frame, corpus.fra) %>%
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "FRA")
 
 # Frontex
+corpus.frontex <- str_c(getwd(), 
+                    "/",
+                    str_subset(files, "frontex[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>%
+  map(tidy)
+
+frontex <- do.call(rbind.data.frame, corpus.frontex) %>%
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "FRONTEX")
 
 # EU-OSHA
-
+euosha <- str_c(getwd(), 
+                 "/",
+                 str_subset(files, "euosha[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EU-OSHA")
 # SRB
+srb <- str_c(getwd(), 
+                "/",
+                str_subset(files, "srb[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "SRB")
 
 # Media total
 dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
-media <- do.call(rbind, mget(names(dfs)[dfs])) # Bind dataframes
+media <- bind_rows(mget(names(dfs)[dfs]), .id = "id") # Bind rows
+
 
 media.month <- media %>%
   group_by(acronym,
-           month = cut(datetimestam, "month"),
+           month = cut(datetimestamp, "month"),
            .drop = FALSE) %>%
   summarise(media = n(),
-            .groups = "keep")
+            .groups = "keep") %>%
+  mutate(month = as.Date(month)) %>%
+  filter(month >= "2015-07-01" & # Start date
+           month <= "2021-06-30") # End date
 
 # Plot time 
-df.month %>% ggplot(aes(x = month, y = media)) +
+media.month %>% ggplot(aes(x = month, y = media)) +
   facet_wrap(~acronym,
              ncol = 6,
              scales = "free") +
-  geom_smooth(method = "lm",
+  geom_smooth(method = "loess",
               se = FALSE,
               size = 0.5) +
   geom_point(size = 1) +
@@ -136,7 +312,5 @@ df.month %>% ggplot(aes(x = month, y = media)) +
         strip.text = element_text(size = 10)) +
   xlab("Time") + ylab("Count") + labs(title = "Appearances in the media (07/15 - 06/21)")
 
-
-
-# Export
+ # Export
 write.csv(media, "media.csv")

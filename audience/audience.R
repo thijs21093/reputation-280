@@ -19,7 +19,7 @@ df.month <- df %>%
   mutate(start = as.POSIXct(start),
          end = as.POSIXct(end)) %>% # Adjust time variables
   filter(start >= "2015-07-01" & # Start date
-         start <= "2021-06-30") %>% # end date
+         start <= "2021-06-30") %>% # End date
   group_by(agencyname, month = cut(start, "month"),  .drop = FALSE) %>%
   summarise(count = sum(tweet_count), .groups = "keep") %>%
   mutate(first_match = min(row_number()[count != 0])) %>% # Set count to NA when an agency has no Twitter

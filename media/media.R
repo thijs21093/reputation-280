@@ -8,7 +8,7 @@ library(tidyr)
 library(ggplot2)
 library(ggthemes)
 
-# All 
+# List of all html paths
 files.list <- list.files(full.names = TRUE) # List of paths
 html <- str_extract(files.list, "\\w*\\.html") # List of htmls
 files <- html[!is.na(html)] # Creates a list of all valid files in folder
@@ -35,7 +35,7 @@ berec <- str_c(getwd(),
   map(Corpus, readerControl = list(language = NA)) %>% 
   map_dfr(tidy) %>% 
   mutate(date = as.POSIXct(datetimestamp),
-         acronym = "BEREC")
+         acronym = "BEREC OFFICE")
 
 # CEDEFOP
 cedefop <- str_c(getwd(), 
@@ -48,16 +48,14 @@ cedefop <- str_c(getwd(),
          acronym = "CEDEFOP")
 
 # CPVO
-## cpvo <- str_c(getwd(), 
-##                 "/",
-##                  str_subset(files, "cpvo[:digit:]")) %>% # Path to htmls
-##   map(FactivaSource) %>% 
-## map(Corpus, readerControl = list(language = NA)) %>% 
-##  map_dfr(tidy) %>% 
-##  mutate(date = as.POSIXct(datetimestamp),
-##         acronym = "CPVO")
-
-# INCORRECT: data needs not be downloaded again
+cpvo <- str_c(getwd(), 
+                 "/",
+                  str_subset(files, "cpvo[:digit:]")) %>% # Path to htmls
+   map(FactivaSource) %>% 
+ map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "CPVO")
 
 # EASA
 corpus.easa <- str_c(getwd(), 
@@ -154,16 +152,14 @@ eiopa <- str_c(getwd(),
          acronym = "EIOPA")
 
 # EMA
-## ema <- str_c(getwd(), 
-##               "/",
-##               str_subset(files, "ema[:digit:]")) %>% # Path to htmls
-##  map(FactivaSource) %>% 
-##  map(Corpus, readerControl = list(language = NA)) %>% 
-##  map_dfr(tidy) %>% 
-##  mutate(date = as.POSIXct(datetimestamp),
-##         acronym = "EMA")
-
-# INCORRECT: data needs not be downloaded again
+ema <- str_c(getwd(), 
+               "/",
+               str_subset(files, "ema[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "EMA")
 
 # EMCDDA
 emcdda <- str_c(getwd(), 
@@ -283,7 +279,6 @@ srb <- str_c(getwd(),
 dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
 media <- bind_rows(mget(names(dfs)[dfs]), .id = "id") # Bind rows
 
-
 media.month <- media %>%
   group_by(acronym,
            month = cut(datetimestamp, "month"),
@@ -297,13 +292,13 @@ media.month <- media %>%
 # Plot time 
 media.month %>% ggplot(aes(x = month, y = media)) +
   facet_wrap(~acronym,
-             ncol = 6,
+             ncol = 5,
              scales = "free") +
   geom_smooth(method = "loess",
               se = FALSE,
               size = 0.5) +
   geom_point(size = 1) +
-  scale_x_date(date_breaks = "1 year",
+  scale_x_date(date_breaks = "2 years",
                date_labels = "%Y") +
   theme_few() +
   theme(axis.ticks = element_blank(),
@@ -313,4 +308,4 @@ media.month %>% ggplot(aes(x = month, y = media)) +
   xlab("Time") + ylab("Count") + labs(title = "Appearances in the media (07/15 - 06/21)")
 
  # Export
-write.csv(media, "media.csv")
+write.csv(media.month, "media.csv")

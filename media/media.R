@@ -3,48 +3,57 @@ library(tm)
 library(purrr)
 library(tidytext)
 library(dplyr)
+library(stringr)
 
-setwd("C:/Users/Thijs/surfdrive/Project A - Accountability landscape/Data/QUANTitative datasets/Complete datasets/Documentation unobtrustive/Media by year")
+# All 
+files.list <- list.files(full.names = TRUE) # List of paths
+html <- str_extract(files.list, "\\w*\\.html") # List of htmls
+files <- html[!is.na(html)] # Creates a list of all valid files in folder
+path <- str_c(getwd(), "/", files) # Construct paths
 
-acer1 <- FactivaSource("./ACER/ACER.html")
-acer.total <- Corpus(acer1, readerControl = list(language = NA)) %>%
-  tidy() %>% 
+# Loading each agency separately
+
+# ACER
+acer <- str_c(getwd(), 
+                   "/",
+                   str_subset(files, "acer[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
   mutate(date = as.POSIXct(datetimestamp),
          acronym = "ACER")
 
-bbi.ju1 <- FactivaSource("./BBI JU/BBI JU.html")
-bbi.ju.total <- Corpus(bbi.ju1, readerControl = list(language = NA)) %>%
-  tidy() %>% 
+# BEREC OFFICE
+berec <- str_c(getwd(), 
+              "/",
+              str_subset(files, "berec[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
   mutate(date = as.POSIXct(datetimestamp),
-         acronym = "BBI JU")
+         acronym = "BEREC")
 
-berec1 <- FactivaSource("./BEREC/BEREC.html")
-berec.total <- Corpus(berec1, readerControl = list(language = NA)) %>%
-  tidy() %>% 
-  mutate(date = as.POSIXct(datetimestamp),
-         acronym = "BEREC OFFICE")
-
-# CdT, no hits
-
-cedefop1 <- FactivaSource("./CEDEFOP/CEDEFOP.html")
-cedefop.total <- Corpus(cedefop1, readerControl = list(language = NA)) %>%
-  tidy() %>% 
+# CEDEFOP
+cedefop <- str_c(getwd(), 
+               "/",
+               str_subset(files, "cedefop[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
   mutate(date = as.POSIXct(datetimestamp),
          acronym = "CEDEFOP")
 
-cepol1 <- FactivaSource("./CEPOL/CEPOL.html")
-cepol.total <- Corpus(cepol1, readerControl = list(language = NA)) %>%
-  tidy() %>% 
-  mutate(date = as.POSIXct(datetimestamp),
-         acronym = "CEPOL")
+# CPVO
+## cpvo <- str_c(getwd(), 
+##                 "/",
+##                  str_subset(files, "cpvo[:digit:]")) %>% # Path to htmls
+##   map(FactivaSource) %>% 
+## map(Corpus, readerControl = list(language = NA)) %>% 
+##  map_dfr(tidy) %>% 
+##  mutate(date = as.POSIXct(datetimestamp),
+##         acronym = "CPVO")
 
-# Clean Sky, no hits
-
-cpvo1 <- FactivaSource("./CPVO/CPVO.html")
-cpvo.total <- Corpus(cpvo1, readerControl = list(language = NA)) %>%
-  tidy() %>% 
-  mutate(date = as.POSIXct(datetimestamp),
-         acronym = "CPVO")
+# INCORRECT: data needs not be dowloaded again
 
 easa1 <- FactivaSource("./EASA/EASA1.html")
 easa2 <- FactivaSource("./EASA/EASA2.html")

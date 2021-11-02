@@ -2,7 +2,7 @@
 
 Work in progress.
 
-# Folder classification
+## Folder classification
 
  - `agency` contains the script used to calculate *information*, *responsiveness*, *topic diversity* and *reputational consequences*.
  - `media` contains the script used to calculate the number of mentions in European newspapers per month for each agency.

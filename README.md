@@ -8,3 +8,4 @@ Work in progress.
  - `media` contains the script used to calculate the number of mentions in European newspapers per month for each agency.
  - `audience` contains the script used to calculate the number of mentions on Twitter per month for each agency.
  - `panel` contains all documents, scripts and output related to the panel data analysis.
+ - `data` contains the data files.

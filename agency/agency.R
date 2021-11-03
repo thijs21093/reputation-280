@@ -1,35 +1,44 @@
 # Library
 library(dplyr)
-library(tidyr)
-library(academictwitteR)
 
 # Data
-load(file="./Data/all_ageny_tweets") # Data
+load(file="./Data/tweets") # Data
 
 # ======================================================
 #           Pre-processing
 # ======================================================
+for (i in seq(tweets))
+  assign(paste0("df", i), tweets[[i]]) # Create seperate dataframes
 
-# Moritz: I went for the loop function, which is super not elegant, but it works. Below is a testrun.
-test$referenced_type = "no reference"
-test$referenced_id = 0
+dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
+df <- bind_rows(mget(names(dfs)[dfs])) # Bind dataframes
 
-for(i in 1:nrow(test)){
-  test$referenced_type[i] = ifelse(is.null(test$referenced_tweets[i][[1]])==F, test$referenced_tweets[i][[1]]$type, 0)
-  test$referenced_id[i] = ifelse(is.null(test$referenced_tweets[i][[1]])==F, test$referenced_tweets[i][[1]]$id, 0)
-}
+from.agency <- df %>%
+  mutate(created_at = as.Date(created_at)) %>%
+  filter(referenced_type != "retweeted" & # Remove retweets
+         referenced_type != "quoted") %>% # Remove quoted tweets
+  distinct(id, .keep_all = TRUE) # remove duplicates
 
-# now for the whole list of tweets
-tweets = list()
-for(f in 1:length(alltweets)){
-  temporary = alltweets[[f]]
-  temporary$referenced_type = "no reference"
-  temporary$referenced_id = 0
-  for(i in 1:nrow(test)){
-    temporary$referenced_type[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$type, 0)
-    temporary$referenced_id[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$id, 0)
-    tweets[[f]] = temporary
-  }
-}
+# Information
 
-save(tweets, file="tweets")
+# TO DO: what does '0' mean in referenced_type
+
+update <- from.agency %>%
+  filter(referenced_type == "no reference") # Initial updates + replies to users (not status)
+
+agency.to.self <- from.agency %>%
+  dplyr::filter(in_reply_to_user_id == author_id) # Tweets to self
+agency.to.self %>% nrow() # Number of replies to self
+
+agency.reply.to.user <- from.agency %>%
+  filter(referenced_type == "no reference" &
+           in_reply_to_user_id != author_id &
+           referenced_id == 0) # Replies to users (but not replies to users' statuses)
+agency.reply.to.user %>% nrow() # Count of replies to users
+
+information <- bind_rows(agency.to.self,
+                         update,
+                         agency.reply.to.user) # Bind updates and replies to self
+information %>% nrow() # Count number of agency updates
+
+

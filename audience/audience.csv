@@ -1,4 +1,4 @@
-"","month","agencyname","count","threat"
+"","month","agencyname","audience_count","audience_threat"
 "1",2017-08-01,"ACER",30,"no"
 "2",2017-09-01,"ACER",38,"no"
 "3",2017-10-01,"ACER",139,"no"

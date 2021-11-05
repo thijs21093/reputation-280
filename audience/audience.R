@@ -9,7 +9,7 @@ library(ggthemes)
 rm(list = ls())
 
 # Load data
-load("./data/audiencecounts")
+load("./data/audiencecounts_updated")
 
 # Create dataframe
 for (i in seq(audiencecounts))
@@ -30,13 +30,13 @@ df.month <- df %>%
   mutate(month = as.POSIXct(month)) %>%
  select(-c(first_match)) # Remove vars
 
-# TO DO: check warning
+# TO DO: Check warnings
 # TO DO: Use from.agency data to determine when agency joined twitter
 
 # Plot time 
-df.month %>% ggplot(aes(x = month, y = count)) +
+df.month %>% ggplot(aes(x = as.Date(month), y = count)) +
   facet_wrap(~agencyname,
-             ncol = 6,
+             ncol = 5,
              scales = "free") +
   geom_smooth(method = "lm",
               se = FALSE,
@@ -54,34 +54,6 @@ df.month %>% ggplot(aes(x = month, y = count)) +
 # Convert df to a tibble
 df.t <- as_tibble(df.month) %>%
   group_by(agencyname) # Create grouped tibble
-
-
-# ======================================================
-#           STL
-# ======================================================
-
-df.anomalized <- df.t %>%
-  time_decompose(count, merge = TRUE, method = "STL") %>% # STL is default
-  anomalize(remainder, method = "gesd") %>%
-  anomalize::time_recompose()
-
-# TO DO: check warnings
-
-# Plot
-df.anomalized %>%
-  plot_anomalies(ncol = 5, alpha_dots = 0.25)
-
-# Extracting the anomalous data points
-anomaly <- df.anomalized %>%
-  mutate(threat = case_when(
-    anomaly == "Yes" & remainder > 0 ~ "yes",
-    TRUE ~ "no"))
-
-# Distribution
-anomaly %>%
-  group_by(threat) %>%
-  dplyr::summarise(count = n()) %>%
-  mutate(prop = count / sum(count)) # Overview of distribution across sentiments
 
 # ======================================================
 #           Twitter decomposition
@@ -108,3 +80,15 @@ anomaly.twitter %>%
   group_by(threat) %>%
   dplyr::summarise(count = n()) %>%
   mutate(prop = count / sum(count)) # Overview of distribution across sentiments
+
+# Bind dataframes
+audience.total <- df.month %>%
+  full_join(anomaly.twitter, by = c("agencyname", "month")) %>%
+  rename(audience_count = count.x,
+         audience_threat = threat) %>%
+  select(c(month,
+           agencyname,
+           audience_count,
+           audience_threat))
+
+write.csv(audience.total, "audience.csv")

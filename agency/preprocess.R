@@ -18,10 +18,10 @@ df <- bind_rows(mget(names(dfs)[dfs])) # Bind dataframes
 
 tibble <-  df %>% 
   as_tibble() %>% # As tibble
-  rename(tweet_id = id) %>%
+  rename(tweet_id = id) %>% # rename to avoid conflicting names
   unnest(cols = referenced_tweets, # Unnest column
          keep_empty = TRUE) %>% # Remove quoted tweets
-  distinct(tweet_id, .keep_all = TRUE) %>% # Remove duplicates
+  distinct(tweet_id, .keep_all = TRUE) %>% # TO DO: why are duplicates created?
   rename(referenced_id = id,
          referenced_type = type) %>% # Unnesting referenced tweets
   mutate(referenced_type = replace_na(referenced_type, "no reference"))
@@ -29,6 +29,8 @@ tibble <-  df %>%
 tibble %>%
   group_by(referenced_type) %>%
   dplyr::summarise(count = n()) # Count
+
+save(tibble, file = "from_tweets")
 
 # Moritz: I went for the loop function, which is super not elegant, but it works. Below is a testrun.
 

@@ -268,6 +268,7 @@ euosha <- str_c(getwd(),
   map_dfr(tidy) %>% 
   mutate(date = as.POSIXct(datetimestamp),
          acronym = "EU-OSHA")
+
 # SRB
 srb <- str_c(getwd(), 
                 "/",
@@ -310,16 +311,22 @@ media.month %>% ggplot(aes(x = month, y = media)) +
         strip.text = element_text(size = 10)) +
   xlab("Time") + ylab("Count") + labs(title = "Appearances in the media (07/15 - 06/21)")
 
+
+# Convert df to a tibble
+df.t <- as_tibble(media.month) %>%
+  group_by(acronym) # Create grouped tibble
+
 # ======================================================
 #           Twitter decomposition
 # ======================================================
 
 df.anomalized.twitter <- df.t %>%
-  time_decompose(count, merge = TRUE, method = "twitter") %>%
+  time_decompose(media, merge = TRUE, method = "twitter") %>%
   anomalize(remainder, method = "gesd") %>% # Same as Erlich et al.
   anomalize::time_recompose()
 
 # TO DO: check warnings
+# NOTE: many values of 1 are classified as anomaly.
 
 # Plot
 df.anomalized.twitter %>%
@@ -327,24 +334,24 @@ df.anomalized.twitter %>%
 
 # Extracting the anomalous data points
 anomaly.twitter <- df.anomalized.twitter %>%
-  mutate(threat = case_when(
+  mutate(media_threat = case_when(
     anomaly == "Yes" & remainder > 0 ~ "yes",
     TRUE ~ "no"))
 
 # Distribution
 anomaly.twitter %>%
-  group_by(threat) %>%
+  group_by(media_threat) %>%
   dplyr::summarise(count = n()) %>%
   mutate(prop = count / sum(count)) # Overview of distribution across sentiments
 
 # Bind dataframes
-audience.total <- df.month %>%
-  full_join(anomaly.twitter, by = c("agencyname", "month")) %>%
-  rename(count = count.x) %>%
+media.total <- media.month %>%
+  full_join(anomaly.twitter, by = c("acronym", "month")) %>%
+  rename(media_count = media.x) %>%
   select(c(month,
-           agencyname,
-           count,
-           threat))
+           acronym,
+           media_count,
+           media_threat))
 
  # Export
-write.csv(media.month, "media.csv")
+write.csv(media.total, "media.csv")

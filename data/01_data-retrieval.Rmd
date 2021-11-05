@@ -1,0 +1,128 @@
+---
+title: "01_data-retrieval"
+author: "Moritz Müller"
+date: "10/20/2021"
+output: html_document
+---
+# Load Twitter handles
+```{r}
+handles =read.csv(file="handles.csv")
+```
+
+
+# Get Tweets
+```{r}
+library(academictwitteR)
+
+#store various agency tweet databases in one list
+alltweets = list()
+
+#cycle through handles and save tweets to alltweets
+for (i in 1:nrow(handles)) {
+  print(handles$twitter_handle[i])
+  agencytweets = get_all_tweets(
+    user = substring(handles$twitter_handle[i], 2),
+    start_tweets = "2010-01-01T00:00:00Z",
+    end_tweets = "2021-09-01T00:00:00Z",
+    bearer_token = get_bearer(),
+    data_path = "data_tweets",
+    bind_tweets = T,
+    n = 100000
+  )
+  agencytweets$agencyhandle = handles$twitter_handle[i]
+  agencytweets$agencyname = handles$acronym[i]
+  alltweets[[i]] = agencytweets
+}
+
+# before collecting audience tweets, lets check how many audience tweetw there actually are - we do not want to get rate locked. 
+#audiencecounts = list()
+audiencecounts2=list() # Frontex and SRB did not work the first time, so we add them now. 
+
+for (i in 24:nrow(handles)) {
+  print(handles$twitter_handle[i])
+  allcounts = count_all_tweets(
+    query = handles$twitter_handle[i],
+    start_tweets = "2010-01-01T00:00:00Z",
+    end_tweets = "2021-09-01T00:00:00Z",
+    bearer_token = get_bearer(),
+    data_path = "data_tweets_audiences2",
+    n = 1000000
+  )
+  allcounts$agencyhandle = handles$twitter_handle[i]
+  allcounts$agencyname = handles$acronym[i]
+  audiencecounts2[[i]] = allcounts
+}
+
+# add Frontex and SRB to the original file (audiencecounts)
+load("audiencecounts")
+audiencecounts[[24]] = audiencecounts2[[24]]
+audiencecounts[[25]] = audiencecounts2[[25]]
+
+save(audiencecounts, file="audiencecounts_updated")
+
+
+###################################################################
+#store all audience tweet databases in one list
+audiencetweets = list()
+
+
+#cycle through handles and save tweets to alltweets
+#for (i in 1:nrow(handles)) {
+  print(handles$twitter_handle[i])
+  agencytweets = get_all_tweets(
+    query = handles$twitter_handle[i],
+    start_tweets = "2010-01-01T00:00:00Z",
+    end_tweets = "2021-09-01T00:00:00Z",
+    bearer_token = get_bearer(),
+    data_path = "data_tweets_audiences",
+    bind_tweets = T,
+    n = 100000
+  )
+  agencytweets$agencyhandle = handles$twitter_handle[i]
+  agencytweets$agencyname = handles$acronym[i]
+  alltweets[[i]] = agencytweets
+}
+
+#efsa timeline
+#test = get_all_tweets(user="Food_EU",
+               start_tweets = "2013-01-01T00:00:00Z",
+               end_tweets = "2021-06-01T00:00:00Z",
+               bearer_token = get_bearer(),
+               data_path = "data",
+               bind_tweets = T,
+               n=10000)
+#save(test, file="EFSAtweets")
+load(file="EFSAtweets")
+#get tweets from people addressing efsa
+#test = get_all_tweets(query="@Food_EU",
+               start_tweets = "2013-01-01T00:00:00Z",
+               end_tweets = "2021-06-01T00:00:00Z",
+               bearer_token = get_bearer(),
+               data_path = "data",
+               bind_tweets = T,
+               n=10000)
+
+# count tweet volume that addresses EFSAs account
+EFSA_tweetcounts = count_all_tweets(query="@Food_EU",
+               start_tweets = "2014-11-28T00:00:00Z",
+               end_tweets = "2021-06-01T00:00:00Z",
+               bearer_token = get_bearer(),
+               n=1000000)
+
+```
+
+# Manipulation and formating
+```{r}
+#test dataset
+test$RT = grepl("RT ", test$text, fixed=TRUE)
+test$date = as.POSIXct(test$created_at,
+                    format = "%Y-%m-%dT%H:%M:%S.000Z")
+test$text_clean = sapply(test$text,function(row) iconv(row, "latin1", "ASCII", sub=""))
+
+#EFSA network chatter
+EFSA_tweetcounts$start = as.POSIXct(EFSA_tweetcounts$start,
+                    format = "%Y-%m-%dT%H:%M:%S.000Z")
+EFSA_tweetcounts$end = as.POSIXct(EFSA_tweetcounts$end,
+                    format = "%Y-%m-%dT%H:%M:%S.000Z")
+
+```

@@ -8,6 +8,9 @@ library(tidyr)
 library(ggplot2)
 library(ggthemes)
 
+
+# Set WD
+
 # List of all html paths
 files.list <- list.files(full.names = TRUE) # List of paths
 html <- str_extract(files.list, "\\w*\\.html") # List of htmls
@@ -306,6 +309,42 @@ media.month %>% ggplot(aes(x = month, y = media)) +
         axis.title = element_text(size = 15),
         strip.text = element_text(size = 10)) +
   xlab("Time") + ylab("Count") + labs(title = "Appearances in the media (07/15 - 06/21)")
+
+# ======================================================
+#           Twitter decomposition
+# ======================================================
+
+df.anomalized.twitter <- df.t %>%
+  time_decompose(count, merge = TRUE, method = "twitter") %>%
+  anomalize(remainder, method = "gesd") %>% # Same as Erlich et al.
+  anomalize::time_recompose()
+
+# TO DO: check warnings
+
+# Plot
+df.anomalized.twitter %>%
+  plot_anomalies(ncol = 5, alpha_dots = 0.25)
+
+# Extracting the anomalous data points
+anomaly.twitter <- df.anomalized.twitter %>%
+  mutate(threat = case_when(
+    anomaly == "Yes" & remainder > 0 ~ "yes",
+    TRUE ~ "no"))
+
+# Distribution
+anomaly.twitter %>%
+  group_by(threat) %>%
+  dplyr::summarise(count = n()) %>%
+  mutate(prop = count / sum(count)) # Overview of distribution across sentiments
+
+# Bind dataframes
+audience.total <- df.month %>%
+  full_join(anomaly.twitter, by = c("agencyname", "month")) %>%
+  rename(count = count.x) %>%
+  select(c(month,
+           agencyname,
+           count,
+           threat))
 
  # Export
 write.csv(media.month, "media.csv")

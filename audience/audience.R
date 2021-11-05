@@ -5,6 +5,9 @@ library(dplyr)
 library(ggplot2)
 library(ggthemes)
 
+# Clear environemnt
+rm(list = ls())
+
 # Load data
 load("./data/audiencecounts")
 
@@ -28,6 +31,7 @@ df.month <- df %>%
  select(-c(first_match)) # Remove vars
 
 # TO DO: check warning
+# TO DO: Use from.agency data to determine when agency joined twitter
 
 # Plot time 
 df.month %>% ggplot(aes(x = month, y = count)) +

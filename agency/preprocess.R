@@ -2,14 +2,36 @@
 library(dplyr)
 library(tidyr)
 
+# Clear environemnt
+rm(list = ls())
+
 # Data
 load(file="./Data/all_ageny_tweets") # Data
-
 # ======================================================
 #           Pre-processing
 # ======================================================
+for (i in seq(alltweets))
+  assign(paste0("df", i), alltweets[[i]]) # Create seperate dataframes
+
+dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
+df <- bind_rows(mget(names(dfs)[dfs])) # Bind dataframes
+
+tibble <-  df %>% 
+  as_tibble() %>% # As tibble
+  rename(tweet_id = id) %>%
+  unnest(cols = referenced_tweets, # Unnest column
+         keep_empty = TRUE) %>% # Remove quoted tweets
+  distinct(tweet_id, .keep_all = TRUE) %>% # Remove duplicates
+  rename(referenced_id = id,
+         referenced_type = type) %>% # Unnesting referenced tweets
+  mutate(referenced_type = replace_na(referenced_type, "no reference"))
+
+tibble %>%
+  group_by(referenced_type) %>%
+  dplyr::summarise(count = n()) # Count
 
 # Moritz: I went for the loop function, which is super not elegant, but it works. Below is a testrun.
+
 test$referenced_type = "no reference"
 test$referenced_id = 0
 

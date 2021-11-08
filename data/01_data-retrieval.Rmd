@@ -111,6 +111,32 @@ EFSA_tweetcounts = count_all_tweets(query="@Food_EU",
 
 ```
 
+
+# Get replies
+```{r}
+# store various agency tweet databases in one list
+allreplies = list()
+
+# cycle through handles and save tweets to allreplies
+for (i in 1:nrow(handles)) {
+  print(handles$twitter_handle[i])
+  repliestweets = get_all_tweets(
+    reply_to = substring(handles$twitter_handle[i], 2),
+    start_tweets = "2010-01-01T00:00:00Z",
+    end_tweets = "2021-09-01T00:00:00Z",
+    bearer_token = get_bearer(),
+    data_path = "data_replies",
+    bind_tweets = T,
+    n = 100000
+  )
+  repliestweets$agencyhandle = handles$twitter_handle[i]
+  repliestweets$agencyname = handles$acronym[i]
+  allreplies[[i]] = allreplies
+}
+
+save(allreplies, file = "all_replies")
+```
+
 # Manipulation and formating
 ```{r}
 #test dataset

@@ -7,6 +7,7 @@ rm(list = ls())
 
 # Data
 load(file="./Data/all_ageny_tweets") # Data
+
 # ======================================================
 #           Pre-processing
 # ======================================================
@@ -16,7 +17,7 @@ for (i in seq(alltweets))
 dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
 df <- bind_rows(mget(names(dfs)[dfs])) # Bind dataframes
 
-tibble <-  df %>% 
+tibble.from <-  df %>% 
   as_tibble() %>% # As tibble
   rename(tweet_id = id) %>% # rename to avoid conflicting names
   unnest(cols = referenced_tweets, # Unnest column
@@ -26,11 +27,11 @@ tibble <-  df %>%
          referenced_type = type) %>% # Unnesting referenced tweets
   mutate(referenced_type = replace_na(referenced_type, "no reference"))
 
-tibble %>%
+tibble.from %>%
   group_by(referenced_type) %>%
   dplyr::summarise(count = n()) # Count
 
-save(tibble, file = "from_tweets")
+save(tibble.from, file = "from_tweets")
 
 # Moritz: I went for the loop function, which is super not elegant, but it works. Below is a testrun.
 

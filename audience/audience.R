@@ -1,4 +1,4 @@
-#libraries
+# Libraries
 library(tidyverse)
 library(anomalize)
 library(dplyr)
@@ -9,7 +9,7 @@ library(ggthemes)
 rm(list = ls())
 
 # Load data
-load("./data/audiencecounts_updated")
+load("./Data/audiencecounts_updated")
 
 # Create dataframe
 for (i in seq(audiencecounts))
@@ -18,77 +18,18 @@ for (i in seq(audiencecounts))
 dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
 df <- do.call(rbind, mget(names(dfs)[dfs])) # Bind dataframes
 
-df.month <- df %>%
+audience.month <- df %>%
   mutate(start = as.POSIXct(start),
          end = as.POSIXct(end)) %>% # Adjust time variables
   filter(start >= "2015-07-01" & # Start date
          start <= "2021-06-30") %>% # End date
-  group_by(agencyname, month = cut(start, "month"),  .drop = FALSE) %>%
-  summarise(count = sum(tweet_count), .groups = "keep") %>%
-  mutate(first_match = min(row_number()[count != 0])) %>% # Set count to NA when an agency has no Twitter
-  filter(row_number() >= first_match) %>%
-  mutate(month = as.POSIXct(month)) %>%
- select(-c(first_match)) # Remove vars
+  group_by(agencyname,
+           month = cut(start, "month"),  
+           .drop = FALSE) %>%
+  summarise(audience_count = sum(tweet_count),
+            .groups = "keep") %>%
+  mutate(month = as.POSIXct(month))  # Remove vars
 
-# TO DO: Check warnings
-# TO DO: Use from.agency data to determine when agency joined twitter
+write.csv(audience.month, "audience.csv")
 
-# Plot time 
-df.month %>% ggplot(aes(x = as.Date(month), y = count)) +
-  facet_wrap(~agencyname,
-             ncol = 5,
-             scales = "free") +
-  geom_smooth(method = "lm",
-              se = FALSE,
-              size = 0.5) +
-  geom_point(size = 1) +
-  scale_x_date(date_breaks = "1 year",
-               date_labels = "%Y") +
-  theme_few() +
-  theme(axis.ticks = element_blank(),
-        axis.text = element_text(size = 10),
-        axis.title = element_text(size = 15),
-        strip.text = element_text(size = 10)) +
-  xlab("Time") + ylab("Count") + labs(title = "Audience tweets (07/15 - 06/21)")
 
-# Convert df to a tibble
-df.t <- as_tibble(df.month) %>%
-  group_by(agencyname) # Create grouped tibble
-
-# ======================================================
-#           Twitter decomposition
-# ======================================================
-df.anomalized.twitter <- df.t %>%
-  time_decompose(count, merge = TRUE, method = "twitter") %>%
-  anomalize(remainder, method = "gesd") %>% # Same as Erlich et al.
-  anomalize::time_recompose()
-
-# TO DO: check warnings
-
-# Plot
-df.anomalized.twitter %>%
-  plot_anomalies(ncol = 5, alpha_dots = 0.25)
-
-# Extracting the anomalous data points
-anomaly.twitter <- df.anomalized.twitter %>%
-  mutate(threat = case_when(
-    anomaly == "Yes" & remainder > 0 ~ "yes",
-    TRUE ~ "no"))
-
-# Distribution
-anomaly.twitter %>%
-  group_by(threat) %>%
-  dplyr::summarise(count = n()) %>%
-  mutate(prop = count / sum(count)) # Overview of distribution across sentiments
-
-# Bind dataframes
-audience.total <- df.month %>%
-  full_join(anomaly.twitter, by = c("agencyname", "month")) %>%
-  rename(audience_count = count.x,
-         audience_threat = threat) %>%
-  select(c(month,
-           agencyname,
-           audience_count,
-           audience_threat))
-
-write.csv(audience.total, "audience.csv")

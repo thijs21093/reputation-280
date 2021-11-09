@@ -293,33 +293,14 @@ media.month <- media %>%
   filter(month >= "2015-07-01" & # Start date
            month <= "2021-06-30") # End date
 
-# Plot time 
-media.month %>% ggplot(aes(x = month, y = media)) +
-  facet_wrap(~acronym,
-             ncol = 5,
-             scales = "free") +
-  geom_smooth(method = "loess",
-              se = FALSE,
-              size = 0.5) +
-  geom_point(size = 1) +
-  scale_x_date(date_breaks = "2 years",
-               date_labels = "%Y") +
-  theme_few() +
-  theme(axis.ticks = element_blank(),
-        axis.text = element_text(size = 10),
-        axis.title = element_text(size = 15),
-        strip.text = element_text(size = 10)) +
-  xlab("Time") + ylab("Count") + labs(title = "Appearances in the media (07/15 - 06/21)")
-
-
+# ======================================================
+#           Twitter decomposition
+# ======================================================
 # Convert df to a tibble
 df.t <- as_tibble(media.month) %>%
   group_by(acronym) # Create grouped tibble
 
-# ======================================================
-#           Twitter decomposition
-# ======================================================
-
+# Anomalize
 df.anomalized.twitter <- df.t %>%
   time_decompose(media, merge = TRUE, method = "twitter") %>%
   anomalize(remainder, method = "gesd") %>% # Same as Erlich et al.

@@ -3,6 +3,8 @@ library(ggplot2)
 library(ggthemes)
 
 # Load data
+hearing <- read.csv("./Data/hearing/hearing_reduced.csv",
+                    sep = ";")
 
 # Data manipulation
 hearing.event <- hearing %>% 
@@ -11,7 +13,7 @@ hearing.event <- hearing %>%
 
 # By month
 hearing.month <- hearing.event %>%
-  group_by(agency,
+  group_by(agencyname,
            month = cut(date, "month"),
            .drop = FALSE) %>%
   summarise(hearing = n(),
@@ -19,35 +21,22 @@ hearing.month <- hearing.event %>%
   mutate(month = as.Date(month)) %>%
   filter(month >= "2015-07-01" & # Start date
            month <= "2021-06-30") %>% # End date
- filter(agency != "BBI",
-        agency != "Cepol",
-        agency != "Clean Sky",
-        agency != "EASO",
-        agency != "EDA",
-        agency != "EDPS",
-        agency != "EIT",
-        agency != "EPPO",
-        agency != "ETF",
-        agency != "Europol",
-        agency != "EU-LISA",
-        agency != "EUISS",
-        agency != "Eurojust",
-        agency != "F4E",
-        agency != "GSA",
-        agency != "IMI",
-        agency != "SESAR") # Removing non-regulatory agencies
+ filter(agencyname != "BBI",
+        agencyname != "Cepol",
+        agencyname != "Clean Sky",
+        agencyname != "EASO",
+        agencyname != "EDA",
+        agencyname != "EDPS",
+        agencyname != "EIT",
+        agencyname != "EPPO",
+        agencyname != "ETF",
+        agencyname != "Europol",
+        agencyname != "EU-LISA",
+        agencyname != "EUISS",
+        agencyname != "Eurojust",
+        agencyname != "F4E",
+        agencyname != "GSA",
+        agencyname != "IMI",
+        agencyname != "SESAR") # Removing non-regulatory agencies
 
-# Plot 
-hearing.month %>% ggplot(aes(x = month, y = hearing)) +
-  facet_wrap(~agency,
-             ncol = 5,
-             scales = "free") +
-  geom_point(size = 1) +
-  scale_x_date(date_breaks = "1 year",
-               date_labels = "%Y") +
-  theme_few() +
-  theme(axis.ticks = element_blank(),
-        axis.text = element_text(size = 10),
-        axis.title = element_text(size = 15),
-        strip.text = element_text(size = 10)) +
-  xlab("Time") + ylab("Count") + labs(title = "Non-routine hearings (07/15 - 04/19)")
+write.csv(hearing.month, "hearing.csv")

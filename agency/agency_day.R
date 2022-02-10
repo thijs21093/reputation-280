@@ -9,6 +9,7 @@ library(anomalize)
 library(zoo)
 library(qdapRegex)
 library(stringr)
+library(lubridate)
 
 load(file="./Data/from_tweets") # Data
 load(file="./Data/to_tweets") # Data
@@ -54,7 +55,7 @@ information <- bind_rows(agency.to.self,
 information %>% nrow() # Count number of agency updates
 
 
-# Information per month
+# Information per day
 information.day<- information %>%
    group_by(agencyname,
             day = cut(created_at, "day"),
@@ -62,13 +63,15 @@ information.day<- information %>%
   summarise(information = n()) %>%
   group_by(agencyname) %>%
    mutate(first_match = min(row_number()[information != 0]), # Get row number of first non-zero for each agency
-   joined = case_when(
-     row_number() >= first_match ~ "yes", # Assumes that first 0 is because of not being on Twitter
-     row_number() < first_match ~ "no"), # Manually checked: assumption is true
+   joined = case_when( 
+    agencyname == "FRONTEX" & row_number() < first_match | # Agencies that joined Twitter after 01-07-2015
+    agencyname == "ACER" & row_number() < first_match |
+    agencyname == "ERA" & row_number() < first_match ~ "no",
+     TRUE ~ "yes"), # Joined = 'yes' for all other agencies
    information = case_when(
      joined == "no" ~ NA_real_, # Set count to NA when an agency has no Twitter
      joined == "yes" ~ as.numeric(as.character(information)))) %>%
-  mutate(month = as.POSIXct(month)) %>%
+  mutate(day = format(round(as.POSIXct(day), "day"))) %>%
    select(-c(first_match)) # Remove var
 
 # ======================================================
@@ -90,7 +93,7 @@ response.filter <- from.agency %>%
   dplyr::select(referenced_id) %>% 
   as.list()
 
-# TO DO: convert '&lt;', '&amp;', etc. to corrent format
+# TO DO: convert '&lt;', '&amp;', etc. to correct format
 
 response  <- to.agency %>%
   dplyr::mutate(response = case_when(
@@ -99,9 +102,14 @@ response  <- to.agency %>%
   mutate(text.url = str_remove_all(text, "@[[:alnum:]_]{2,}"),# Remove user
          text.url = rm_url(text.url, pattern = pastex("@rm_twitter_url", "@rm_url", "rm_white_lead")),  # Remove url
          question.mark = ifelse(grepl("\\?", text.url), 1, 0), # Does text contain question mark?
-  length = str_length(text.url)) # Length of text without url
+  length = str_length(text.url), # Length of text without urls/mentions (@[user])
+  time = difftime(strptime(created_at, format = "%Y-%m-%d"),
+                   strptime("2015-07-01", format = "%Y-%m-%d"),
+                  units = c("days")) %>% # Number of days passed since start
+    round(0) %>% # Ignore differences because of summer/winter time
+    as.numeric()) # Numeric
 
-         response %>%
+response %>%
   group_by(response) %>%
   summarise(n = n()) %>%
   mutate(freq = n / sum(n)) 
@@ -114,7 +122,7 @@ sentiment <- vader_df(response$text,
                             neu_set = T,
                             rm_qm = T) # Calculate valence of tweets
 
-consequences <- merge(sentiment,
+tweet.data <- merge(sentiment,
                       response,
                       by.y = "text",
                       by.x = "text") %>% # Merge scores with data
@@ -125,68 +133,76 @@ consequences <- merge(sentiment,
     compound >= 0.05 ~ "positive"))
 
 # Distribution
-consequences %>%
+tweet.data %>%
   group_by(sentiment) %>%
   dplyr::summarise(count = n())
 
-consequences.month <- consequences %>%
-  dplyr::group_by(agencyname, month = cut(created_at, "month"),  .drop = FALSE)  %>% 
+# Consequences
+consequences.day <- tweet.data %>%
+  dplyr::group_by(agencyname, day = cut(created_at, "day"),  .drop = FALSE)  %>% 
   dplyr::count(sentiment) %>%
   pivot_wider(names_from = "sentiment",
               values_from = "n",
               values_fill = 0) %>% 
   dplyr::select(-`NA`) %>%
-  mutate(month = as.POSIXct(month))
+  mutate(day = format(round(as.POSIXct(day), "day")))
+
+# Remove columns
+tweet.data <- tweet.data %>%
+  dplyr::select(where(is.numeric), where(is.character), where(is.Date)) # remove non-numeric & non-character rows
 
 # ======================================================
 #           Joining dataframes
 # ======================================================
 
 # Join dataframes
-twitter.month <- information.month %>%
-  full_join(response.month,  by = c("agencyname", "month")) %>%
-  full_join(consequences.month,  by = c("agencyname", "month"))
+twitter.day <- information.day %>%
+  full_join(consequences.day,  by = c("agencyname", "day")) %>%
+  mutate(day = format(round(as.POSIXct(day), "day")))
   
 # Load other data
-audience <- read.csv("audience/audience.csv") %>%
-  mutate(month = as.POSIXct(month)) %>% # TO DO: change name of column from 'count' to 'audience_count'
+audience <- read.csv("audience/audience_day.csv") %>%
+  mutate(day = format(round(as.POSIXct(day), "day"))) %>%
   select(-X) 
-hearing <- read.csv("hearing/hearing.csv") %>%
-  mutate(month = as.POSIXct(month)) %>%
+hearing <- read.csv("hearing/hearing_day.csv") %>%
+  mutate(day = format(round(as.POSIXct(day), "day"))) %>%
   select(-X)
-media <- read.csv("media/media.csv") %>%
-  mutate(month = as.POSIXct(month)) %>%
+media <- read.csv("media/media_day.csv") %>%
+  mutate(day = format(round(as.POSIXct(day), "day"))) %>%
   select(-X)
 
-total.month <- twitter.month %>%
-  full_join(audience,  by = c("agencyname", "month")) %>%
-  full_join(hearing,  by = c("agencyname", "month")) %>%
-  full_join(media,  by = c("agencyname" = "acronym", "month")) %>%
-  mutate(hearing = replace_na(hearing, 0)) %>%  # Set 'hearing' to 0 when agency has never been subject of hearing
-        mutate_at(.vars = c("response",
-                            "no.response",
-                            "discussion",
-                            "positive",
+# To do: save as .Rdata instead of csv
+
+total.day <- twitter.day %>%
+  full_join(audience,  by = c("agencyname", "day")) %>%
+  full_join(hearing,  by = c("agencyname", "day")) %>%
+  full_join(media,  by = c("agencyname" = "acronym", "day")) %>%
+  mutate(hearing = tidyr::replace_na(hearing, 0), # Set 'hearing' to 0 when agency has never been subject of hearing
+         hearing = case_when(day > "2019-05-01" ~ NA_real_, 
+           TRUE ~ as.numeric(hearing))) %>%  # Set all values for variable 'hearing' before 01-05-2019 to NA
+        mutate_at(.vars = c("positive",
                             "neutral",
                             "negative",
-                            "audience"),
-                  funs(ifelse(joined == "no", NA, .)))
-
+                            "audience_count"),
+                  funs(ifelse(joined == "no", NA, .))) %>% # Twitter variable to NA when agency was not on Twitter
+  mutate(day = format(round(as.POSIXct(day), "day")))
 
 # ======================================================
 #           Anomaly detection: Audience
 # ======================================================
 
 # Convert df to a tibble
-df.t <- as_tibble(total.month) %>%
-  group_by(agencyname) # Create grouped tibble
+df.t <- as_tibble(total.day) %>%
+  group_by(agencyname) %>% # Create grouped tibble
+  mutate(day = as.Date(day)) %>%
+  select(c(day, agencyname, audience_count))
 
 df.anomalized.twitter <- df.t %>%
   drop_na() %>%
-  time_decompose(audience, merge = TRUE, method = "twitter") %>%
+  time_decompose(audience_count, merge = TRUE, method = "twitter") %>%
   anomalize(remainder, method = "gesd") %>% # Same as Erlich et al.
   anomalize::time_recompose()
-
+warnings()
 # TO DO: check warnings
 
 # Plot
@@ -196,67 +212,82 @@ df.anomalized.twitter %>%
 # Extracting the anomalous data points
 anomaly.twitter <- df.anomalized.twitter %>%
   mutate(audience_threat = case_when(
-    anomaly == "Yes" & remainder > 0 ~ "yes",
-    TRUE ~ "no"))
+    anomaly == "Yes" & remainder > 0 ~ 1,
+    TRUE ~ 0),
+    audience_silence = case_when(
+      anomaly == "Yes" & remainder < 0 ~ 1,
+      TRUE ~ 0)) %>%
+  select(c(day, agencyname, audience_threat, audience_silence)) %>%
+  mutate(day = format(round(as.POSIXct(day), "day")))
 
 # Distribution
 anomaly.twitter %>%
-  group_by(audience_threat) %>%
+  group_by(audience_threat, audience_silence) %>%
   dplyr::summarise(count = n()) %>%
   mutate(prop = count / sum(count)) # Overview of distribution across sentiments
 
 # Bind dataframes
-all.vars <- total.month %>%
-  full_join(anomaly.twitter %>% select(c(agencyname, month, audience_threat)),
-            by = c("agencyname", "month"))
+all.vars <- total.day %>%
+  full_join(anomaly.twitter,
+            by = c("agencyname", "day"))
 
 # ======================================================
-#           Rolling sum
+#           Rolling sum/lags
 # ======================================================
-data <- all.vars %>%
-  arrange(month) %>% # Arrange by month
+data.day <- all.vars %>%
+  arrange(day) %>% # Arrange by day
   group_by(agencyname) %>%
-dplyr::mutate(criticism.12 = rollapplyr(negative, list(seq(-12, -1)), sum, fill = NA, partial = FALSE, align = "right"),
-              praise.12 = rollapplyr(positive, list(seq(-12, -1)), sum, fill = NA, partial = FALSE, align = "right"),
-              neutral.12 = rollapplyr(neutral, list(seq(-12, -1)), sum, fill = NA, partial = FALSE, align = "right"),
-              valence.12 = ifelse(!(praise.12 + neutral.12 + criticism.12), 0, (praise.12 - criticism.12)/ (praise.12 + neutral.12 + criticism.12)),
-                criticism.3 = rollapplyr(negative, list(seq(-3, -1)), sum, fill = NA, partial = FALSE, align = "right"),
-                praise.3 = rollapplyr(positive, list(seq(-3, -1)), sum, fill = NA, partial = FALSE, align = "right"),
-                neutral.3 = rollapplyr(neutral, list(seq(-3, -1)), sum, fill = NA, partial = FALSE, align = "right"),
-                valence.3 = ifelse(!(praise.3 + neutral.3 + criticism.3), 0, (praise.3 - criticism.3)/ (praise.3 + neutral.3 + criticism.3)),
-                  media_count.3 = rollapplyr(media_count, list(seq(-3, -1)), sum, fill = NA, partial = FALSE, align = "right"),
-                  media_count.12 = rollapplyr(media_count, list(seq(-12, -1)), sum, fill = NA, partial = FALSE, align = "right"))
-
-# Export
-write.csv(data, "data.csv")
+dplyr::mutate(criticism.3m = rollapplyr(negative,
+                                       list(seq(-90, -1)),
+                                       sum, fill = NA,
+                                       align = "right"),
+              praise.3m = rollapplyr(positive,
+                                    list(seq(-90, -1)),
+                                    sum, fill = NA,
+                                    align = "right"),
+              neutral.3m = rollapplyr(neutral,
+                                     list(seq(-90, -1)),
+                                     sum, fill = NA,
+                                     align = "right"),
+              valence.3m = ifelse(!(praise.3m + neutral.3m + criticism.3m),
+                                 0,
+                                 (praise.3m - criticism.3m) / (praise.3m + neutral.3m + criticism.3m)),
+              media_count.3m = rollapplyr(media,
+                                         list(seq(-90, -1)),
+                                         sum,
+                                         fill = NA,
+                                         align = "right"),
+              hearing.3m = rollapplyr(hearing,
+                                         list(seq(-90, -1)),
+                                         sum,
+                                         fill = NA,
+                                         align = "right"),
+              information.1w = rollapplyr(information,
+                                          list(seq(-7, -1)),
+                                          sum,
+                                          fill = NA,
+                                          align = "right"),
+              audience_count.1d = lag(audience_count, k = -1),
+              audience_threat.1d = lag(audience_threat, k = -1),
+              audience_silence.1d = lag(audience_silence, k = -1))
 
 # ======================================================
-#           Plots
+#           Plot
 # ======================================================
-
-# Information
-data %>% ggplot(aes(x = as.Date(month), y = information)) +
-  facet_wrap(~agencyname,
-             ncol = 5,
-             scales = "free") +
-  geom_smooth(method = "loess",
-              se = FALSE,
-              size = 0.5) +
-  geom_point(size = 1) +
-  scale_x_date(date_breaks = "2 years",
-               date_labels = "%Y") +
-  theme_few() +
-  theme(axis.ticks = element_blank(),
-        axis.text = element_text(size = 10),
-        axis.title = element_text(size = 15),
-        strip.text = element_text(size = 10)) +
-  xlab("Time") + ylab("Count") + labs(title = "Information (07/15 - 06/21)")
 
 # Responsiveness
-data %>% ggplot(aes(x = as.Date(month), y = ifelse(!discussion, 0, (response/discussion)))) +
-  facet_wrap(~agencyname,
-             ncol = 5,
-             scales = "free") +
+tweet.data %>% 
+group_by(response, created_at) %>%
+  tally() %>% 
+  tidyr::pivot_wider(names_from = response, 
+                     values_from = n,
+                     values_fill	= 0) %>%
+  mutate(month = lubridate::floor_date(created_at, unit = "month")) %>%
+  group_by(month) %>%            # group by the binning variable
+  summarise(no.response = sum(no.response),
+            response = sum(response)) %>%
+  mutate(ratio = response/(response + no.response)) %>%
+  ggplot(aes(x = as.Date(month), y = ratio)) +
   geom_smooth(method = "loess",
               se = FALSE,
               size = 0.5) +
@@ -270,71 +301,17 @@ data %>% ggplot(aes(x = as.Date(month), y = ifelse(!discussion, 0, (response/dis
         strip.text = element_text(size = 10)) +
   xlab("Time") + ylab("Count") + labs(title = "Responsiveness (07/15 - 06/21)")
 
-# Responsiveness
-data %>% ggplot(aes(x = as.Date(month), y = valence.3)) + # 3 Months rolling sum
-  facet_wrap(~agencyname,
-             ncol = 5,
-             scales = "free") +
-  geom_smooth(method = "loess",
-              se = FALSE,
-              size = 0.5) +
-  geom_point(size = 1) +
-  scale_x_date(date_breaks = "2 years",
-               date_labels = "%Y") +
-  theme_few() +
-  theme(axis.ticks = element_blank(),
-        axis.text = element_text(size = 10),
-        axis.title = element_text(size = 15),
-        strip.text = element_text(size = 10)) +
-  xlab("Time") + ylab("Count") + labs(title = "Valence of replies, 3 months rolling sum (07/15 - 06/21)")
+# ======================================================
+#           Merging
+# ======================================================
+tweet.data <- tweet.data %>%
+  mutate(day = format(round(as.POSIXct(created_at), "day")), .keep = "unused")
 
-# Audience
-data %>% ggplot(aes(x = as.Date(month), y = audience_count)) +
-  facet_wrap(~agencyname,
-             ncol = 5,
-             scales = "free") +
-  geom_smooth(method = "lm",
-              se = FALSE,
-              size = 0.5) +
-  geom_point(size = 1) +
-  scale_x_date(date_breaks = "1 year",
-               date_labels = "%Y") +
-  theme_few() +
-  theme(axis.ticks = element_blank(),
-        axis.text = element_text(size = 10),
-        axis.title = element_text(size = 15),
-        strip.text = element_text(size = 10)) +
-  xlab("Time") + ylab("Count") + labs(title = "Audience tweets (07/15 - 06/21)")
+data.merge <- tweet.data %>%
+  left_join(data.day,
+            by = c("agencyname", "day"))
 
-# Media
-data %>% ggplot(aes(x = as.Date(month), y = media_count.3)) + # 3 months rolling sum
-  facet_wrap(~agencyname,
-             ncol = 5,
-             scales = "free") +
-  geom_smooth(method = "loess",
-              se = FALSE,
-              size = 0.5) +
-  geom_point(size = 1) +
-  scale_x_date(date_breaks = "2 years",
-               date_labels = "%Y") +
-  theme_few() +
-  theme(axis.ticks = element_blank(),
-        axis.text = element_text(size = 10),
-        axis.title = element_text(size = 15),
-        strip.text = element_text(size = 10)) +
-  xlab("Time") + ylab("Count") + labs(title = "Appearances in the media (07/15 - 06/21)")
+save(data.merge, file = "data_day.Rda")
 
-# Hearing
-data %>% ggplot(aes(x = as.Date(month), y = hearing)) +
-  facet_wrap(~agencyname,
-             ncol = 5,
-             scales = "free") +
-  geom_point(size = 1) +
-  scale_x_date(date_breaks = "1 year",
-               date_labels = "%Y") +
-  theme_few() +
-  theme(axis.ticks = element_blank(),
-        axis.text = element_text(size = 10),
-        axis.title = element_text(size = 15),
-        strip.text = element_text(size = 10)) +
-  xlab("Time") + ylab("Count") + labs(title = "Non-routine hearings (07/15 - 04/19)")
+
+

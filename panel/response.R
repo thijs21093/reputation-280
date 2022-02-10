@@ -60,7 +60,6 @@ reg <- data.merge %>% mutate(
   media_count.3m.cwc = center(media_count.3m, type = "CWC", cluster = data.merge$agencyname)) # CWC
 
 
-
 x <- c("response.num",
        "time.year",
        "negative_tweet.cgm",
@@ -121,16 +120,17 @@ var.table %>%
 reg %>%
 group_by(agencyname) %>%
   summarize(total = n(),
+            response = sum(response.num == 1),
             prop = sum(response.num == 1) / n()) %>%
   arrange(desc(prop)) %>%
   kable(col.names = c("Agency",
                       "Total",
+                      "Response",
                       "Response (%)"),
-        digits = 2) %>% 
+        digits = 3) %>% 
   kable_styling(bootstrap_options = c("condensed"),
                 full_width = F,
                 position = "left")
-
 
 # ======================================================
 #           GLMM

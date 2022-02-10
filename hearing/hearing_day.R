@@ -8,8 +8,9 @@ hearing <- read.csv("./Data/hearing/hearing_reduced.csv",
 
 # Data manipulation
 hearing.event <- hearing %>% 
-  filter(type == "FA" | type == "both") %>%
-  mutate(date = as.Date(date,  "%d-%m-%Y"))
+  filter(type == "FA" | type == "both") %>% # Only fire alarm
+  mutate(date = as.Date(date,  "%d-%m-%Y")) %>%
+  distinct(meeting, date, agencyname, .keep_all = TRUE) # 1 meeting = 1 count
 
 # By day
 hearing.day <- hearing.event %>%

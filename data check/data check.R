@@ -1,5 +1,6 @@
 # Library
 library(dplyr)
+library(tidyr)
 library(tibble)
 library(ggplot2)
 library(ggthemes)
@@ -175,7 +176,10 @@ response.free  <- tibble.to %>%
     tweet_id %in% response.filter.free[["referenced_id"]] ~ "response", # Code as 'response' when agency tweet is AT LEAST ONCE responded to
     !tweet_id %in% response.filter.free[["referenced_id"]] ~ "no.response"), # Code as 'no.response' if not
     created_at = as.Date(created_at))  %>% 
-  filter(response == "response") %>%
+  filter(response == "response" &
+         lang == "en"  &
+         in_reply_to_user_id != author_id,
+         !is.na(referenced_id))  %>%
   count(created_at, agencyname, name = "freq")
 
 response.free %>% ggplot(mapping = 

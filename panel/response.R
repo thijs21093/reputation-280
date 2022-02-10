@@ -10,6 +10,14 @@ library(multcomp)
 library(GLMMadaptive)
 library(effects)
 library(sjPlot)
+library(lme4)
+library(multilevel)
+
+
+# TO DO: move code chunk to other script
+# TO DO: add attachement do dataset
+# TO DO: check no repsonses for frontex
+# TO DO: check replies that don't start with "@"
 
 load("./data/data_day.Rda")
 
@@ -18,11 +26,9 @@ load("./data/data_day.Rda")
 # ======================================================
 
 conversation <- data.merge %>% group_by(conversation_id) %>%
-  summarise(conversations = length(unique(conversation_id)))
+  summarise(conversations = length(conversation_id))
 
 data.merge <- data.merge %>% full_join(conversation)
-
-# To do: move to other script
 
 # Centering & transformation
 # ======================================================
@@ -45,41 +51,38 @@ reg <- data.merge %>% mutate(
                                sentiment == "negative" ~ 1,
                                TRUE ~ 0), 
   length.cgm = center(length), # CGM
+  conversations.cwc = center(conversations, type = "CWC", cluster = data.merge$agencyname), # CGM
+  positive_tweet.cgm = center(positive_tweet), # CGM
+  neutral_tweet.cgm = center(neutral_tweet), # CGM
+  negative_tweet.cgm = center(negative_tweet), # CGM
   question.mark.cgm = center(question.mark), # CGM
   valence.3m.cwc = center(valence.3m, type = "CWC", cluster = data.merge$agencyname), # CWC
-  media_count.3m.cwc = center(media_count.3m, type = "CWC", cluster = data.merge$agencyname), # CWC
-  positive_tweet.cwc = center(positive_tweet, type = "CWC", cluster = data.merge$agencyname),
-  neutral_tweet.cwc = center(neutral_tweet, type = "CWC", cluster = data.merge$agencyname),
-  negative_tweet.cwc = center(negative_tweet, type = "CWC", cluster = data.merge$agencyname), 
-  sentiment.num.cwc = center(sentiment.num, type = "CWC", cluster = data.merge$agencyname))
-
-# TO DO: move code chunk to other script
-# TO DO: add attachement do dataset
-# TO DO: check no repsonses for frontex
-# TO DO: check replies that don't start with "@"
+  media_count.3m.cwc = center(media_count.3m, type = "CWC", cluster = data.merge$agencyname)) # CWC
 
 
 
 x <- c("response.num",
        "time.year",
-       "negative_tweet.cwc",
-       "neutral_tweet.cwc",
-       "positive_tweet.cwc",
-       "information.1w.lcwc",
+       "negative_tweet.cgm",
+       "neutral_tweet.cgm",
+       "positive_tweet.cgm",
+       "valence.3m.cwc",
        "media_count.3m.cwc",
        "question.mark.cgm",
-       "length.cgm")
+       "length.cgm",
+       "conversations.cwc")
 
 var.table <- reg %>%
   dplyr::select(c(response.num,
                   time.year,
-                  negative_tweet.cwc,
-                  neutral_tweet.cwc,
-                  positive_tweet.cwc,
-                  information.1w.lcwc,
+                  negative_tweet.cgm,
+                  neutral_tweet.cgm,
+                  positive_tweet.cgm,
+                  valence.3m.cwc,
                   media_count.3m.cwc,
                   question.mark.cgm,
-                  length.cgm)) %>%
+                  length.cgm,
+                  conversations.cwc)) %>%
   descr() %>% 
   data.frame() %>% 
   dplyr::select(-type,
@@ -93,12 +96,14 @@ var.table <- reg %>%
 
 var.label <- c("Response",
                "Time (years)",
-               "Negative tweet (CWC)",
-               "Neutral tweet (CWC)",
-               "Positive tweet (CWC)",
+               "Negative tweet (GMC)",
+               "Neutral tweet (GMC)",
+               "Positive tweet (GMC)",
+               "Valence, prev. 3 months (CWC)",
                "Media count, prev 3 months (CWC)",
                "Question mark (GMC)",
-               "Length (GMC)")
+               "Length (GMC)",
+               "Length of conservation")
 
 row.names(var.table) <- var.label
 var.table %>%
@@ -131,213 +136,99 @@ group_by(agencyname) %>%
 #           GLMM
 # ======================================================
 
-# Testing for random effect
-# ======================================================
-m1.0 <- mixed_model(fixed = response.num ~ time.year, # As per: https://drizopoulos.github.io/GLMMadaptive/articles/GLMMadaptive.html
-                    random = ~ 1 | agencyname,
+# Empty model
+l1.0 <- glmer(response.num ~ 1 +
+                    (1 | agencyname / conversation_id),
+                    na.action = na.omit,
                     data = reg,
-                   family = binomial())
+                    family = binomial(link = "logit"))
 
-summary(m1.0)
-
-m1.1 <- glm(response.num ~ time.year, data = reg, family = binomial())
-
-summary(m1.1)
-
-anova(m1.0, m1.1) # A highly significant p-value suggests that there are correlations in the data that cannot be ignored.
-                  # Boundary test would be better
-
-m1.2 <- mixed_model(fixed = response.num ~ time.year,
-                    random = ~ time.year || agencyname, # || means that the covariance between the random intercepts and random slopes is zero.
-                    data = reg,
-                    family = binomial())
-
-summary(m1.2)
-
-anova(m1.0, m1.2) # Significant p-value suggests that we need the random slopes term.
+summary(l1.0)
+performance::icc(l1.1, by_group = TRUE) # Variance by group
 
 
-m1.3 <- mixed_model(fixed = response.num ~ time.year,
-                    random = ~ time.year | agencyname,
-                    data = reg,
-                    family = binomial())
-summary(m1.3)
+# Adding time as fixed effect
+l1.1 <- glmer(response.num ~ time.year +
+                (1 | agencyname) +
+                (1 | agencyname:conversation_id),
+              na.action = na.omit,
+              data = reg,
+              family = binomial(link = "logit"))
 
-anova(m1.2, m1.3) # Non-significant p-value suggests that the covariance between the two random effects terms is not statistically different from zero.
+summary(l1.1)
+anova(l1.0, l1.1)
 
-# Stepwise regression
-# ======================================================
+# Adding time as random effect
+l1.2 <- glmer(response.num ~ time.year +
+                (time.year | agencyname) +
+                (1 | agencyname:conversation_id),
+              na.action = na.omit,
+              data = reg,
+              family = binomial(link = "logit"))
 
-# Salience
-m2.0 <- mixed_model(fixed = response.num ~ 
-                    audience_threat.1d.cwc +
-                    audience_count.1d.lcwc +
-                    media_count.3m.cwc +
-                    time.year,
-                    random = ~ time.year | agencyname,
-                    data = reg,
-                    family = binomial())
-summary(m2.0)
+summary(l1.2)
+anova(l1.1, l1.2)
 
-# Valence
-m2.1 <- mixed_model(fixed = response.num ~ 
-                      valence.3m.cwc +
-                      sentiment.num.cwc +
-                      time.year,
-                    random = ~ time.year | agencyname,
-                    data = reg,
-                    family = binomial())
-summary(m2.1)
+# Note: Does not converge!
 
-m2.2 <- mixed_model(fixed = response.num ~ 
-                      valence.3m.cwc +
-                      negative_tweet.cwc + 
-                      positive_tweet.cwc +
-                      time.year,
-                    random = ~ time.year | agencyname,
-                    data = reg,
-                    family = binomial())
-summary(m2.2)
+# Adding main IVs
+l1.3 <- glmer(response.num ~ time.year +
+              valence.3m.cwc +
+              media_count.3m.cwc +
+              (1 | agencyname / conversation_id),
+              na.action = na.omit,
+              data = reg,
+              family = binomial(link = "logit"))
 
-# L1 controls
-m2.3 <- mixed_model(fixed = response.num ~ 
-                    question.mark.cgm +
-                    length.cgm +
-                    information.1w.lcwc +
-                    time.year,
-                    random = ~ time.year | agencyname,
-                    data = reg,
-                    family = binomial())
-summary(m2.3)
+summary(l1.3)
 
-# All vars
+# Adding interaction effect
+l1.4 <- glmer(response.num ~ time.year +
+                valence.3m.cwc*media_count.3m.cwc +
+                (1 | agencyname / conversation_id),
+              na.action = na.omit,
+              data = reg,
+              family = binomial(link = "logit"))
 
-reg.na <- reg %>%
-  select(response.num, 
-  audience_threat.1d.cwc,
-  audience_count.1d.lcwc,
-  media_count.3m.cwc,
-  valence.3m.cwc,
-  negative_tweet.cwc,
-  positive_tweet.cwc,
-  question.mark.cgm,
-  length.cgm,
-  information.1w.lcwc,
-  time.year,
-  agencyname) %>%
-  drop_na()
+summary(l1.4)
 
-m2.4 <- mixed_model(fixed = response.num ~ 
-                      audience_threat.1d.cwc +
-                      audience_count.1d.lcwc +
-                      media_count.3m.cwc +
-                      valence.3m.cwc +
-                      negative_tweet.cwc + 
-                      positive_tweet.cwc +
-                      question.mark.cgm +
-                      length.cgm +
-                      information.1w.lcwc +
-                      time.year,
-                    random = ~ time.year | agencyname,
-                    data = reg.na,
-                    family = binomial())
-
-summary(m2.4)
-
-ranef(m2.4)
-
-# Interaction effect
-# ======================================================
-
-# Valence X Salience
-m3.0 <- mixed_model(fixed = response.num ~ 
-                      audience_threat.1d.cwc +
-                      audience_count.1d.lcwc +
-                      media_count.3m.cwc +
-                      valence.3m.cwc +
-                      negative_tweet.cwc + 
-                      positive_tweet.cwc +
-                      question.mark.cgm +
-                      length.cgm +
-                      information.1w.lcwc +
-                      time.year +
-                      valence.3m.cwc:audience_threat.1d.cwc,
-                    random = ~ time.year | agencyname,
-                    data = reg,
-                    family = binomial())
-summary(m3.0)
-
-plot(Effect(c("audience_threat.1d.cwc", "valence.3m.cwc"), m3.0),
+plot(Effect(c("media_count.3m.cwc", "valence.3m.cwc"), l1.2),
      rug = FALSE,
-     xlab = "Audience threat",
+     xlab = "Media salience",
      ylab = "P(repsponse)")
 
-m3.1 <- mixed_model(fixed = response.num ~ 
-                      audience_threat.1d.cwc +
-                      audience_count.1d.lcwc +
-                      media_count.3m.cwc +
-                      valence.3m.cwc +
-                      negative_tweet.cwc + 
-                      positive_tweet.cwc +
-                      question.mark.cgm +
-                      length.cgm +
-                      information.1w.lcwc +
-                      time.year +
-                      valence.3m.cwc:audience_count.1d.lcwc,
-                    random = ~ time.year | agencyname,
-                    data = reg,
-                    family = binomial())
-summary(m3.1)
+# Adding L1 control variables
+l1.5 <- glmer(response.num ~ time.year +
+                valence.3m.cwc*media_count.3m.cwc +
+                sentiment +
+                question.mark.cgm +
+                length.cgm +
+                (1 | agencyname / conversation_id),
+              na.action = na.omit,
+              data = reg,
+              family = binomial(link = "logit"))
 
-plot(Effect(c("audience_count.1d.lcwc", "valence.3m.cwc"), m3.1),
-     rug = FALSE,
-     xlab = "Audience count",
-     ylab = "P(repsponse)")
+summary(l1.5)
 
-m3.2 <- mixed_model(fixed = response.num ~
-                      audience_threat.1d.cwc +
-                      audience_count.1d.lcwc +
-                      media_count.3m.cwc +
-                      valence.3m.cwc +
-                      negative_tweet.cwc + 
-                      positive_tweet.cwc +
-                      question.mark.cgm +
-                      length.cgm +
-                      information.1w.lcwc +
-                      time.year +
-                      valence.3m.cwc:media_count.3m.cwc,
-                    random = ~ time.year | agencyname,
-                    data = reg,
-                    family = binomial())
-summary(m3.2)
+# Adding L2 control variables
+l1.6 <- glmer(response.num ~ time.year +
+                sentiment +
+                question.mark.cgm +
+                length.cgm +
+                conversations.cwc +
+                valence.3m.cwc*media_count.3m.cwc +
+                (1 | agencyname / conversation_id),
+              na.action = na.omit,
+              data = reg,
+              family = binomial(link = "logit"))
 
-plot(Effect(c("media_count.3m.cwc", "valence.3m.cwc"), m3.2),
-     rug = FALSE,
-     xlab = "Media count",
-     ylab = "P(repsponse)")
+summary(l1.6)
 
-m3.3 <- mixed_model(fixed = response.num ~
-                      audience_threat.1d.cwc +
-                      audience_count.1d.lcwc +
-                      media_count.3m.cwc +
-                      valence.3m.cwc +
-                      negative_tweet.cwc + 
-                      positive_tweet.cwc +
-                      question.mark.cgm +
-                      length.cgm +
-                      information.1w.lcwc +
-                      time.year +
-                      hearing.3m.cwc +
-                      valence.3m.cwc:hearing.3m.cwc,
-                    random = ~ time.year | agencyname,
-                    data = reg,
-                    family = binomial())
-summary(m3.3)
+# Adding L3 control variables
+## Not yet included in dataset
 
-plot(Effect(c("hearing.3m.cwc", "valence.3m.cwc"), m3.3),
-     rug = FALSE,
-     xlab = "Hearing",
-     ylab = "P(repsponse)")
+
+
 
 # Exporting
 tab_model(m3.0, m3.1, m3.2, m3.3,

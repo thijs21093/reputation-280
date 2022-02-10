@@ -19,17 +19,15 @@ dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
 df <- do.call(rbind, mget(names(dfs)[dfs])) # Bind dataframes
 
 audience.day <- df %>%
-  mutate(start = as.POSIXct(start),
-         end = as.POSIXct(end)) %>% # Adjust time variables
+  mutate(start = round(as.POSIXct(start), "day"), # Adjust time variables:
+         end = round(as.POSIXct(end), "day")) %>% # Ignore winter / summer time
   filter(start >= "2015-07-01" & # Start date
          start <= "2021-06-30") %>% # End date
   group_by(agencyname,
            day = cut(start, "day"),  
            .drop = FALSE) %>%
   summarise(audience_count = sum(tweet_count),
-            .groups = "keep") %>%
-  mutate(day = as.POSIXct(day))  # Remove vars
+            .groups = "keep")  # Remove vars
 
 write.csv(audience.day, "audience_day.csv")
-
 

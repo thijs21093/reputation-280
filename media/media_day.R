@@ -281,7 +281,11 @@ srb <- str_c(getwd(),
 
 # Media total
 dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
-media <- bind_rows(mget(names(dfs)[dfs]), .id = "id") # Bind rows
+media <- bind_rows(mget(names(dfs)[dfs]), .id = "id") %>% # Bind rows
+  mutate(day = round(as.POSIXct(datetimestamp), "day"))
+
+class(media$day)
+head(media$day)
 
 media.day <- media %>%
   group_by(acronym,
@@ -289,9 +293,11 @@ media.day <- media %>%
            .drop = FALSE) %>%
   summarise(media = n(),
             .groups = "keep") %>%
-  mutate(day = as.Date(day)) %>%
+  mutate(day = round(as.POSIXct(day), "day")) %>%
   filter(day >= "2015-07-01" & # Start date
            day <= "2021-06-30") # End date
 
- # Export
+# Export
 write.csv(media.day, "media_day.csv")
+
+

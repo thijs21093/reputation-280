@@ -8,7 +8,6 @@ library(tidyr)
 library(ggplot2)
 library(ggthemes)
 
-
 # Set WD
 
 # List of all html paths
@@ -82,13 +81,16 @@ eba <- str_c(getwd(),
   mutate(date = as.POSIXct(datetimestamp),
          acronym = "EBA")
 
+
 # ECDC
-ecdc <- str_c(getwd(), 
+corpus.ecdc <- str_c(getwd(), 
              "/",
              str_subset(files, "ecdc[:digit:]")) %>% # Path to htmls
   map(FactivaSource) %>% 
   map(Corpus, readerControl = list(language = NA)) %>% 
-  map_dfr(tidy) %>% 
+  map(tidy)
+
+ecdc <- do.call(rbind.data.frame, corpus.ecdc) %>%
   mutate(date = as.POSIXct(datetimestamp),
          acronym = "ECDC")
 
@@ -144,6 +146,7 @@ eige <- str_c(getwd(),
   map_dfr(tidy) %>% 
   mutate(date = as.POSIXct(datetimestamp),
          acronym = "EIGE")
+
 # EIOPA
 eiopa <- str_c(getwd(), 
               "/",
@@ -155,14 +158,16 @@ eiopa <- str_c(getwd(),
          acronym = "EIOPA")
 
 # EMA
-ema <- str_c(getwd(), 
+corpus.ema <- str_c(getwd(), 
                "/",
                str_subset(files, "ema[:digit:]")) %>% # Path to htmls
   map(FactivaSource) %>% 
   map(Corpus, readerControl = list(language = NA)) %>% 
-  map_dfr(tidy) %>% 
+  map(tidy)
+
+ema <- do.call(rbind.data.frame, corpus.ema) %>%
   mutate(date = as.POSIXct(datetimestamp),
-         acronym = "EMA")
+         acronym = "EMA") 
 
 # EMCDDA
 emcdda <- str_c(getwd(), 
@@ -206,12 +211,14 @@ era <- str_c(getwd(),
          industry = as.list(industry))
 
 # ESMA
-esma <- str_c(getwd(), 
+corpus.esma <- str_c(getwd(), 
              "/",
              str_subset(files, "esma[:digit:]")) %>% # Path to htmls
   map(FactivaSource) %>% 
   map(Corpus, readerControl = list(language = NA)) %>% 
-  map_dfr(tidy) %>% 
+  map(tidy)
+
+esma <- do.call(rbind.data.frame, corpus.esma) %>%
   mutate(date = as.POSIXct(datetimestamp),
          acronym = "ESMA")
 
@@ -262,7 +269,9 @@ frontex <- do.call(rbind.data.frame, corpus.frontex) %>%
 # EU-OSHA
 euosha <- str_c(getwd(), 
                  "/",
-                 str_subset(files, "euosha[:digit:]")) %>% # Path to htmls
+                 str_subset(files, "euosha")) %>% # Path to htmls
+  # Forgot to put a digit behind file name
+  # As there is only one html file, [:digit:] is not nescessary.
   map(FactivaSource) %>% 
   map(Corpus, readerControl = list(language = NA)) %>% 
   map_dfr(tidy) %>% 
@@ -270,12 +279,14 @@ euosha <- str_c(getwd(),
          acronym = "EU-OSHA")
 
 # SRB
-srb <- str_c(getwd(), 
+corpus.srb <- str_c(getwd(), 
                 "/",
                 str_subset(files, "srb[:digit:]")) %>% # Path to htmls
   map(FactivaSource) %>% 
   map(Corpus, readerControl = list(language = NA)) %>% 
-  map_dfr(tidy) %>% 
+  map(tidy)
+
+srb <- do.call(rbind.data.frame, corpus.srb) %>%
   mutate(date = as.POSIXct(datetimestamp),
          acronym = "SRB")
 
@@ -284,20 +295,27 @@ dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
 media <- bind_rows(mget(names(dfs)[dfs]), .id = "id") %>% # Bind rows
   mutate(day = round(as.POSIXct(datetimestamp), "day"))
 
-class(media$day)
-head(media$day)
+source <- media %>%
+  group_by(origin) %>%
+  count()
 
 media.day <- media %>%
+  filter(origin != "Reuters News" & # Filter out Reuters b/c it publishes A LOT about some agencies.
+        language == "en") %>%
   group_by(acronym,
            day = cut(datetimestamp, "day"),
            .drop = FALSE) %>%
   summarise(media = n(),
             .groups = "keep") %>%
-  mutate(day = round(as.POSIXct(day), "day")) %>%
-  filter(day >= "2015-07-01" & # Start date
-           day <= "2021-06-30") # End date
+  mutate(day = round(as.POSIXct(day), "day")) 
+
+media %>%
+  filter(day < "2009-01-01" & # Start date
+           day > "2021-12-31") %>% # End date
+  nrow() # Check if news articles are outside expected range
 
 # Export
+save(media, file = "media.Rdata")
 write.csv(media.day, "media_day.csv")
 
 

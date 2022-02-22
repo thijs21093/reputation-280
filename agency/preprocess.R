@@ -10,11 +10,11 @@ library(tidyr)
 rm(list = ls())
 
 # Data
-load(file="./Data/all_ageny_tweets") # Data
+load(file="./Data/data_tweets_2/alltweets2") # Data
 
 # Create dataframe
-for (i in seq(alltweets))
-  assign(paste0("df", i), alltweets[[i]]) # Create seperate dataframes
+for (i in seq(alltweets)){
+  assign(paste0("df", i), alltweets[[i]])} # Create seperate dataframes
 
 dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
 df <- bind_rows(mget(names(dfs)[dfs])) # Bind dataframes

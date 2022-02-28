@@ -24,16 +24,103 @@ for (i in 1:nrow(handles)) {
   agencytweets = get_all_tweets(
     user = substring(handles$twitter_handle[i], 2),
     start_tweets = "2010-01-01T00:00:00Z",
-    end_tweets = "2021-09-01T00:00:00Z",
+    end_tweets = "2021-12-31T00:00:00Z",
     bearer_token = get_bearer(),
-    data_path = "data_tweets",
+    data_path = "data_tweets_2",
     bind_tweets = T,
-    n = 100000
+    n=1000000
   )
   agencytweets$agencyhandle = handles$twitter_handle[i]
   agencytweets$agencyname = handles$acronym[i]
   alltweets[[i]] = agencytweets
 }
+
+#save(alltweets, file = "data_tweets_2/alltweets2")
+
+```
+# Bind all tweets to a dataframe
+```{r}
+test$referenced_type = "no reference"
+test$referenced_id = 0
+
+for(i in 1:nrow(test)){
+  test$referenced_type[i] = ifelse(is.null(test$referenced_tweets[i][[1]])==F, test$referenced_tweets[i][[1]]$type, 0)
+  test$referenced_id[i] = ifelse(is.null(test$referenced_tweets[i][[1]])==F, test$referenced_tweets[i][[1]]$id, 0)
+}
+
+# now for the whole list of tweets
+tweets = list()
+for(f in 1:length(alltweets)){
+  temporary = alltweets[[f]]
+  temporary$referenced_type = "no reference"
+  temporary$referenced_id = 0
+  for(i in 1:nrow(test)){
+    temporary$referenced_type[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$type, 0)
+    temporary$referenced_id[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$id, 0)
+    tweets[[f]] = temporary
+  }
+}
+
+save(tweets, file="tweets")
+```
+
+# Manipulation and formating
+```{r}
+#test dataset
+test$RT = grepl("RT ", test$text, fixed=TRUE)
+test$date = as.POSIXct(test$created_at,
+                    format = "%Y-%m-%dT%H:%M:%S.000Z")
+test$text_clean = sapply(test$text,function(row) iconv(row, "latin1", "ASCII", sub=""))
+
+#EFSA network chatter
+EFSA_tweetcounts$start = as.POSIXct(EFSA_tweetcounts$start,
+                    format = "%Y-%m-%dT%H:%M:%S.000Z")
+EFSA_tweetcounts$end = as.POSIXct(EFSA_tweetcounts$end,
+                    format = "%Y-%m-%dT%H:%M:%S.000Z")
+
+```
+
+# Get replies
+```{r}
+# store various agency tweet databases in one list
+allreplies = list()
+
+# cycle through handles and save tweets to allreplies
+for (i in 1:nrow(handles)) {
+  print(handles$twitter_handle[i])
+  repliestweets = get_all_tweets(
+    reply_to = substring(handles$twitter_handle[i], 2),
+    start_tweets = "2010-01-01T00:00:00Z",
+    end_tweets = "2021-12-31T00:00:00Z",
+    bearer_token = get_bearer(),
+    data_path = "data_replies_2",
+    bind_tweets = T,
+    n = 1000000
+  )
+  repliestweets$agencyhandle = handles$twitter_handle[i]
+  repliestweets$agencyname = handles$acronym[i]
+  allreplies[[i]] = repliestweets
+}
+
+save(allreplies, file = "all_replies_2")
+
+replytweets = list()
+for(f in 1:length(allreplies)){
+  temporary = allreplies[[f]]
+  print(temporary$agencyname)
+  temporary$referenced_type = "no reference"
+  temporary$referenced_id = 0
+  for(i in 1:nrow(temporary)){
+    temporary$referenced_type[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$type, 0)
+    temporary$referenced_id[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$id, 0)
+    replytweets[[f]] = temporary
+  }
+}
+save(replytweets, file="replytweets.Rdata")
+```
+
+#Legacy code
+```{r}
 
 # before collecting audience tweets, lets check how many audience tweetw there actually are - we do not want to get rate locked. 
 #audiencecounts = list()
@@ -111,46 +198,29 @@ EFSA_tweetcounts = count_all_tweets(query="@Food_EU",
                n=1000000)
 
 ```
-
-# Manipulation and formating
+# Bind all tweets to a dataframe
 ```{r}
-#test dataset
-test$RT = grepl("RT ", test$text, fixed=TRUE)
-test$date = as.POSIXct(test$created_at,
-                    format = "%Y-%m-%dT%H:%M:%S.000Z")
-test$text_clean = sapply(test$text,function(row) iconv(row, "latin1", "ASCII", sub=""))
+test$referenced_type = "no reference"
+test$referenced_id = 0
 
-#EFSA network chatter
-EFSA_tweetcounts$start = as.POSIXct(EFSA_tweetcounts$start,
-                    format = "%Y-%m-%dT%H:%M:%S.000Z")
-EFSA_tweetcounts$end = as.POSIXct(EFSA_tweetcounts$end,
-                    format = "%Y-%m-%dT%H:%M:%S.000Z")
-
-```
-
-# Get replies
-```{r}
-# store various agency tweet databases in one list
-allreplies = list()
-
-# cycle through handles and save tweets to allreplies
-for (i in 1:nrow(handles)) {
-  print(handles$twitter_handle[i])
-  repliestweets = get_all_tweets(
-    reply_to = substring(handles$twitter_handle[i], 2),
-    start_tweets = "2010-01-01T00:00:00Z",
-    end_tweets = "2021-09-01T00:00:00Z",
-    bearer_token = get_bearer(),
-    data_path = "data_replies",
-    bind_tweets = T,
-    n = 100000
-  )
-  repliestweets$agencyhandle = handles$twitter_handle[i]
-  repliestweets$agencyname = handles$acronym[i]
-  allreplies[[i]] = repliestweets
+for(i in 1:nrow(test)){
+  test$referenced_type[i] = ifelse(is.null(test$referenced_tweets[i][[1]])==F, test$referenced_tweets[i][[1]]$type, 0)
+  test$referenced_id[i] = ifelse(is.null(test$referenced_tweets[i][[1]])==F, test$referenced_tweets[i][[1]]$id, 0)
 }
 
-save(allreplies, file = "all_replies")
-```
+# now for the whole list of tweets
+tweets = list()
+for(f in 1:length(alltweets)){
+  temporary = alltweets[[f]]
+  temporary$referenced_type = "no reference"
+  temporary$referenced_id = 0
+  for(i in 1:nrow(test)){
+    temporary$referenced_type[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$type, 0)
+    temporary$referenced_id[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$id, 0)
+    tweets[[f]] = temporary
+  }
+}
 
+save(tweets, file="tweets")
+```
 

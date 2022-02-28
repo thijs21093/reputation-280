@@ -44,11 +44,11 @@ save(tibble.from, file = "from_tweets")
 rm(list = ls())
 
 # Data
-load(file="./Data/all_replies") # Data
+  load(file="./Data/data_replies_2/all_replies_2") # Data
 
 # Create dataframe
-for (i in seq(allreplies))
-  assign(paste0("df.to", i), allreplies[[i]]) # Create seperate dataframes
+for (i in seq(allreplies)){
+  assign(paste0("df.to", i), allreplies[[i]])} # Create seperate dataframes
 
 dfs.to <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
 df.to <- bind_rows(mget(names(dfs.to)[dfs.to])) # Bind dataframes

@@ -4,9 +4,7 @@ Work in progress.
 
 ## Folder classification
 
- - `agency` contains the script used to calculate *information*, *responsiveness*, *topic diversity* and *reputational consequences*.
- - `media` contains the script used to calculate the number of mentions in European newspapers per month for each agency.
- - `audience` contains the script used to calculate the number of mentions on Twitter per month for each agency.
- - `panel` contains all documents, scripts and output related to the panel data analysis.
- - `hearing` containts the script used to calculate the number of non-routine hearings per month for each agency.
+ - `data cleaning` contains the script to clean the data.
  - `data` contains the data files.
+ - `panel` contains all documents and scripts related to the analyses.
+ - `output` contains all output, such as tables and figures.

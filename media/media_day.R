@@ -147,6 +147,19 @@ eige <- str_c(getwd(),
   mutate(date = as.POSIXct(datetimestamp),
          acronym = "EIGE")
 
+# ELA
+ela <- str_c(getwd(), 
+              "/",
+              str_subset(files, "ela[:digit:]")) %>% # Path to htmls
+  map(FactivaSource) %>% 
+  map(Corpus, readerControl = list(language = NA)) %>% 
+  map_dfr(tidy) %>% 
+  mutate(date = as.POSIXct(datetimestamp),
+         acronym = "ELA",
+         infocode = as.list(infocode))
+
+# Note: Forgot to set date range, but no articles after 31/12/2021
+
 # EIOPA
 eiopa <- str_c(getwd(), 
               "/",
@@ -298,6 +311,7 @@ media <- bind_rows(mget(names(dfs)[dfs]), .id = "id") %>% # Bind rows
 source <- media %>%
   group_by(origin) %>%
   count()
+source
 
 media.day <- media %>%
   filter(origin != "Reuters News" & # Filter out Reuters b/c it publishes A LOT about some agencies.
@@ -312,10 +326,11 @@ media.day <- media %>%
 media %>%
   filter(day < "2009-01-01" & # Start date
            day > "2021-12-31") %>% # End date
-  nrow() # Check if news articles are outside expected range
+  nrow() # Check if news articles are outside expected date range
 
 # Export
-save(media, file = "media.Rdata")
+save(media.day, file = "media_day.Rdata")
 write.csv(media.day, "media_day.csv")
 
-
+save(media, file = "media.Rdata")
+write.csv(media, "media.csv")

@@ -18,6 +18,7 @@ library(merDeriv)
 library(lfe)
 library(fixest)
 library(modelsummary)
+library(jtools)
 
 # TO DO: move code chunk to other script
 # TO DO: add attachement do dataset
@@ -29,28 +30,12 @@ load("./data/data_day.Rda")
 #           Centering, transformation & description
 # ======================================================
 
-conversation <- data.merge %>% group_by(conversation_id) %>%
-  summarise(conversations = length(conversation_id))
-
-data.merge <- data.merge %>% full_join(conversation, by = "conversation_id")
-
 # Centering & transformation: cross-sectional
 # ======================================================
-reg <- data.merge %>% mutate(year =  format(as.POSIXct(day), format="%Y"),
-                             weekday = weekdays(as.Date(day)), # weekend versus weekday
-                             time.1000 = (time/1000),
-                             weekend = case_when(
-                                weekday == "zaterdag" ~ "weekend",
-                                weekday == "zondag" ~ "weekend",
-                                TRUE ~ "weekday"),
-                             response.num = case_when(
-                               response == "response" ~ 1,
-                               response == "no.response" ~ 0)) %>%
-  drop_na(valence.3m, media_count.3m) %>%
-mutate(length.s = scale(length),
-      valence.3m.s  = scale(valence.3m),
+reg <- data.merge %>%
+  mutate(valence.3m.s  = scale(valence.3m),
       media_count.3m.s  = scale(media_count.3m), 
-      conversations.s = scale(conversations))
+      conversations.s = scale(conversations)) # Scale continious variables.
 
 x <- c("response.num",
        "time",
@@ -128,7 +113,10 @@ group_by(agencyname) %>%
 # ======================================================
 
 # NOTE: for model comparison, check if models have the same number of observations
-# To do: Add other variables of interest to models. THis includes time since joining date
+
+# Note: specify drop_na() in formula:
+# If using 3 months lag, set drop_na(support.3m)
+# # If using 1 month lag, set drop_na(support.1m), etc.
 
 # Model 1.0: Main IVs
 f1.0 <- feglm(response.num ~ 
@@ -508,6 +496,8 @@ m1.8c <- wbm(information.log ~
              family = "gaussian")
 
 summary(m1.8c)
+
+probe_interaction() #  https://rdrr.io/cran/interactions/man/probe_interaction.html
 
 # GLMMTMB
 m1.8d <- glmmTMB(information ~

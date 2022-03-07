@@ -48,7 +48,7 @@ agency_descriptives <- c("frontex", "border control agency", "border patrol agen
 trial_dataframe <- trial_dataframe[trial_dataframe$name %in% agency_descriptives,]
 
 # best approach seems to be to measure positivity and negativity separately
-# Let's take the metion with the highest score and lowest score to see differences.
+# Let's take the metion with the lowest score to see differences.
 trial_dataframe <- trial_dataframe %>% 
   group_by(id) %>% 
-  summarize
+  slice(which.min(score))

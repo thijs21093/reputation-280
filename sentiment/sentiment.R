@@ -9,8 +9,8 @@ library(dplyr)
 
 #load documents
 load("media/media.Rdata")
-load("Data/data_replies_2/to_tweets")
-load("Data/data_tweets_2/from_tweets")
+load("from_tweets_2")
+load("to_tweets_2")
 
 #only keep english tweets
 tibble.from <- tibble.from[tibble.from$lang=="en",]
@@ -19,11 +19,13 @@ tibble.to <- tibble.to[tibble.to$lang=="en",]
 
 # combine headings and text in media df to retrieve as many references to the agencies as possible
 media$complete_text <- paste(paste0(media$heading, "."), media$text)
+media$complete_text <- gsub("\r?\n|\r", " ", media$complete_text)
 
-### TRIAL ###
+### TRIAL for media articles ###
 
 #take first 100 media articles
 media_trial <- media[media$id=="frontex",][1:100,]
+media_trial$id <- as.character(c(1:100))
 
 #pass to gcs
 trial_results <- gl_nlp(
@@ -32,6 +34,8 @@ trial_results <- gl_nlp(
   type = c("PLAIN_TEXT"),
   language = c("en")
 )
+
+#save(trial_results, file="sentiment/mediasentiment_output.RData")
 
 #extract results to a usable format
 testlist <- trial_results
@@ -52,3 +56,30 @@ trial_dataframe <- trial_dataframe[trial_dataframe$name %in% agency_descriptives
 trial_dataframe <- trial_dataframe %>% 
   group_by(id) %>% 
   slice(which.min(score))
+
+#introduce combined measure of magnitude and score to avoid misclassifications
+trial_dataframe$com_score <- trial_dataframe$magnitude*trial_dataframe$score
+
+#join text and score dataset
+media_sentiment <- left_join(media_trial, trial_dataframe, by="id")
+
+#save file
+save(media_sentiment, file="sentiment/media_sentiment.RData")
+### TRIAL for tweets ###
+#take first 100 media articles
+tweets_trial <- tibble.to[1:10,]
+
+#pass to gcs
+tweets_results <- gl_nlp(
+  tweets_trial$text,
+  nlp_type = "analyzeSentiment",
+  type = c("PLAIN_TEXT"),
+  language = c("en")
+)
+
+#add sentiment to tweet dataset
+tweets_trial$sentiment <- tweets_results$documentSentiment$score 
+tweets_trial$magnitude <- tweets_results$documentSentiment$magnitude 
+
+save(tweets_trial, file="sentiment/tweets_sentiment.RData")
+save(tweets_results, file="sentiment/tweetssentiment_output.RData")

@@ -6,7 +6,9 @@ output: html_document
 ---
 # Load Twitter handles + libraries
 ```{r}
-handles =read.csv(file="handles.csv")
+handles =read.csv(file="handles.csv", sep=";")
+handles[26,] = c("ELA", "European Union Labour Authority", "@EU_ELA", "https://twitter.com/EU_ELA", "1-6-2019")
+write.csv(handles, file="handles.csv")
 
 library(academictwitteR)
 ```
@@ -23,10 +25,10 @@ for (i in 1:nrow(handles)) {
   print(handles$twitter_handle[i])
   agencytweets = get_all_tweets(
     user = substring(handles$twitter_handle[i], 2),
-    start_tweets = "2010-01-01T00:00:00Z",
+    start_tweets = "2007-01-01T00:00:00Z",
     end_tweets = "2021-12-31T00:00:00Z",
     bearer_token = get_bearer(),
-    data_path = "data_tweets_2",
+    data_path = "data_tweets_3",
     bind_tweets = T,
     n=1000000
   )
@@ -35,7 +37,8 @@ for (i in 1:nrow(handles)) {
   alltweets[[i]] = agencytweets
 }
 
-#save(alltweets, file = "data_tweets_2/alltweets2")
+
+save(alltweets, file = "data_tweets_3/alltweets3")
 
 ```
 # Bind all tweets to a dataframe
@@ -54,7 +57,7 @@ for(f in 1:length(alltweets)){
   temporary = alltweets[[f]]
   temporary$referenced_type = "no reference"
   temporary$referenced_id = 0
-  for(i in 1:nrow(test)){
+  for(i in 1:nrow(temporary)){
     temporary$referenced_type[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$type, 0)
     temporary$referenced_id[i] = ifelse(is.null(temporary$referenced_tweets[i][[1]])==F, temporary$referenced_tweets[i][[1]]$id, 0)
     tweets[[f]] = temporary
@@ -86,14 +89,14 @@ EFSA_tweetcounts$end = as.POSIXct(EFSA_tweetcounts$end,
 allreplies = list()
 
 # cycle through handles and save tweets to allreplies
-for (i in 1:nrow(handles)) {
+for (i in 24:nrow(handles)) {
   print(handles$twitter_handle[i])
   repliestweets = get_all_tweets(
     reply_to = substring(handles$twitter_handle[i], 2),
-    start_tweets = "2010-01-01T00:00:00Z",
+    start_tweets = "2007-01-01T00:00:00Z",
     end_tweets = "2021-12-31T00:00:00Z",
     bearer_token = get_bearer(),
-    data_path = "data_replies_2",
+    data_path = "data_replies_3",
     bind_tweets = T,
     n = 1000000
   )
@@ -102,7 +105,10 @@ for (i in 1:nrow(handles)) {
   allreplies[[i]] = repliestweets
 }
 
-save(allreplies, file = "all_replies_2")
+# EURightsAgency does not work for some reason (no 23) skipped it for now
+save(allreplies, file = "all_replies_3")
+
+
 
 replytweets = list()
 for(f in 1:length(allreplies)){

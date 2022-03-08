@@ -6,5 +6,5 @@ Work in progress.
 
  - `data cleaning` contains the script to clean the data.
  - `data` contains the data files.
- - `panel` contains all documents and scripts related to the analyses.
+ - `analysis` contains all documents and scripts related to the analyses.
  - `output` contains all output, such as tables and figures.

@@ -13,20 +13,21 @@ library(lubridate)
 library(sjmisc)
 library(textutils)
 
-load(file="./data (not public)/from_tweets/from_tweets") # Data
-load(file="./data (not public)/to_tweets/to_tweets") # Data
+load(file = "./data (not public)/from_tweets/from_tweets_2") # Data
+load(file = "./data (not public)/to_tweets/to_tweets_2") # Data
 
 # ======================================================
 #           Information
 # ======================================================
 
 from.agency <- tibble.from %>%
- arrange(referenced_type != 'replied_to') %>% # remove 'quoted' if 'replied to' is present
+ arrange(referenced_type != 'replied_to') %>% # remove 'quoted' if 'replied to' is present for same tweet id
   distinct(tweet_id, .keep_all = TRUE) %>%
   mutate(url = paste0("www.twitter.com/", author_id, "/status/", tweet_id),  # add url
-         created_at = as.Date(created_at))
+         created_at = as.Date(created_at),
+         mutate(text = textutils::HTMLdecode(text))) # Decode html
 
-# Check for duplicates  
+# Check for duplicates
 from.agency %>% 
   group_by(tweet_id) %>%
   filter(n()> 1) %>%
@@ -74,20 +75,6 @@ reply.to.status <- from.agency %>%
         in_reply_to_user_id != author_id)
 reply.to.status %>% nrow() # Count of replies to user statuses
 
-#           Engagement with others (engagement)
-# ======================================================
-engagement <- bind_rows(reply.to.user,
-                         reply.to.status) # Bind updates and replies to self
-
-engagement %>% nrow() # Count number of tweets in data
-
-engagement.week <- engagement %>%
-  group_by(agencyname,
-           week = cut(created_at, "week"),
-           .drop = FALSE) %>%
-  summarise(information = n()) %>%
-  mutate(week = format(round(as.POSIXct(week), "day")))
-
 #           Information
 # ======================================================
 information <- bind_rows(update,
@@ -129,14 +116,18 @@ joining.date <- from.agency %>%
   ungroup() %>% 
   complete(agencyname) %>%
   select(-information)
-  
-# Note some agencies joined before 1 January, 2010.
+
+# First activity by any EU agency  
+start <- joining.date %>% 
+  slice_min(join.day, n = 1) %>%
+  select(join.day) %>% 
+  as.character()
 
 # ======================================================
 #           Responsiveness
 # ======================================================
 
-#           Creating variables
+#           Preparing dataframe
 # ======================================================
 
 to.agency <- tibble.to %>%
@@ -161,7 +152,23 @@ response.filter <- from.agency %>%
   dplyr::select(referenced_id) %>% 
   as.list()
 
+#           Adding joining date and conversation length
+# ======================================================
+# Add joining date
 to.agency2  <- to.agency %>% 
+  full_join(joining.date, by = "agencyname")
+
+# Calculate length of conversations
+conversation <- to.agency2 %>% group_by(conversation_id) %>%
+  summarise(conversations = length(conversation_id))
+
+# Add length of conversations
+agency3 <- to.agency2 %>%
+  full_join(conversation, by = "conversation_id")
+
+#           Adding other variables
+# ======================================================
+response <- to.agency3 %>%
 
   # Did the agency respond?
   dplyr::mutate(response = case_when(
@@ -190,8 +197,15 @@ to.agency2  <- to.agency %>%
   
   # Real time
   real.time = difftime(strptime(created_at, format = "%Y-%m-%d"),
-                   strptime("2010-01-01", format = "%Y-%m-%d"),
+                   strptime(start, format = "%Y-%m-%d"),
                   units = c("days")) %>% # Number of days passed since start
+    round(0) %>% # Ignore differences because of summer/winter time
+    as.numeric(), # Numeric
+  
+  # Time on Twitter
+  time.on.Twitter = difftime(strptime(created_at, format = "%Y-%m-%d"),
+                       strptime(join.day, format = "%Y-%m-%d"),
+                       units = c("days")) %>% # Number of days passed since start
     round(0) %>% # Ignore differences because of summer/winter time
     as.numeric(), # Numeric
   
@@ -205,27 +219,20 @@ to.agency2  <- to.agency %>%
            weekday == "zondag" ~ "weekend",   # Sunday
            TRUE ~ "weekday"))
 
-#           Number of tweets in conversation
+
 # ======================================================
-conversation <- to.agency2 %>% group_by(conversation_id) %>%
-  summarise(conversations = length(conversation_id))
-
-response <- to.agency2 %>%
-  full_join(conversation, by = "conversation_id")
-
-
-#           Question mark/mention in agency tweet
-# ======================================================
+#           Constructing variables: from tweets
+# ======================================================           Question mark/mention in agency tweet
 mentions <- from.agency %>%
-
+  
   # Select variables
   select(c(entities, text, tweet_id, agencyhandle)) %>% 
   
-  # Unnnest entities and select variables
+  # Unnest entities and select variables
   unnest(cols = c(entities)) %>%
   select(c(mentions, text, tweet_id, agencyhandle)) %>%
   
-  # Unnnest mentions and keep empty rows
+  # Unnest mentions and keep empty rows
   unnest(cols = c(mentions)) %>%
   
   # Filter out mentions of self
@@ -235,7 +242,9 @@ mentions <- from.agency %>%
   # Create list with tweet_ids of tweets that include a mention
   dplyr::select(tweet_id) %>% 
   as.list()
-  
+
+#           Mention/question mark
+# ======================================================
 engaging <- from.agency %>%
   mutate(
     
@@ -244,15 +253,16 @@ engaging <- from.agency %>%
       tweet_id %in% mentions[["tweet_id"]] ~ 1, # Code as 1 if tweet mentions AT LEAST one user
       !tweet_id %in% mentions[["tweet_id"]] ~ 0), # Code as 0 if not
     
-    # Check if agency tweet contains handle of a user other than the agency sending the tweet 
+    # Remove handles and urls
     text.url = str_remove_all(text, "@[[:alnum:]_]{2,}"),# Remove user
     text.url = rm_url(text.url, pattern = pastex("@rm_twitter_url", "@rm_url", "rm_white_lead")),  # Remove url  
     
-  # Question mark in agency tweet
+  # Question mark in cleaned agency tweet
   qm.agency = ifelse(grepl("\\?", text.url), 1, 0)) %>%
   select(c(mention, qm.agency, tweet_id))
 
-# Add new variable to response df
+#           Add new variables to response df
+# ======================================================
 response2 <- response %>%
   left_join(engaging, # Left join, b/c we only want tweets TO agencies
             by = c("referenced_id" = "tweet_id")) %>% # Link between tweets from agencies and tweet to agencies
@@ -260,8 +270,7 @@ response2 <- response %>%
   
 response2 %>%
   select(c(mention, qm.agency)) %>% 
-  descr # 0.74% missing
-
+  descr # 0.88% missing
 
 # ======================================================
 #           Description of response variable
@@ -272,7 +281,6 @@ response2 %>%
 
 # All responses
 response2 %>%
-  filter(!is.na(qm.agency)) %>%
   group_by(response) %>%
   summarise(n = n()) %>%
   mutate(freq = n / sum(n)) 
@@ -297,13 +305,7 @@ response2 %>%
 # Note: Missingness is caused by tweets that no longer exist (i.e., deleted) or 
 # that have not been returned by the API. 
 
-#           Check distribution of responsiveness per week     
-# ======================================================
-
-# To do 
-
-
-#           Table with responsiveness per agency     
+#           Table with responsiveness per agency-halfyear     
 # ======================================================
 response.agency <- response2 %>% 
   group_by(response, agencyname) %>%
@@ -327,20 +329,27 @@ response.plot <- response2 %>%
   mutate(halfyear = lubridate::floor_date(created_at, unit = "halfyear")) %>%
   group_by(halfyear, agencyname) %>%            # Group by the binning variable
   summarise(no.response = sum(no.response),
-            response = sum(response))
+            response = sum(response)) %>%
+  group_by(agencyname) %>% 
+  mutate(max = case_when(
+    max(no.response) > max(response) ~ max(no.response),
+    max(response) > max(no.response) ~ max(response))) %>% 
+  ungroup() %>%
+  arrange(max) %>%               # sort dataframe
+  mutate(agencyname = factor(agencyname, unique(agencyname))) # reset factor-column based on that order
 
-# Creating a plot with 
+# Creating a plot 
 response.plot %>%
   ggplot(aes(x = as.Date(halfyear))) +  
-  facet_wrap(facets = ~agencyname,  nrow = 5, scales = "free_y") +
+  facet_wrap(facets = ~agencyname,  nrow = 9, scales = "free_y") +
   geom_point(aes(y = (response + 1), color = "Response", shape = "Response"), size = 2) +
   geom_point(aes(y = (no.response + 1), color = "No response", shape = "No response"), size = 2) +
   geom_smooth(aes(y = (no.response + 1), color = "No response"), se = FALSE) +
   geom_smooth(aes(y = (response + 1), color = "Response"), se = FALSE) +
   scale_colour_manual("", values = c("#1aafd4", "#D43F1A")) +
   scale_shape_manual("", values = c(17, 16)) +
-  scale_x_date(date_breaks = "3 years",
-               date_labels = "%Y") +
+  scale_x_date(date_breaks = "2 years",
+               date_labels = "%y") +
   scale_y_log10() +
   theme_bw() +
   theme(axis.ticks = element_blank(),
@@ -349,11 +358,13 @@ response.plot %>%
         axis.title = element_text(size = 18),
         strip.text = element_text(size = 18),
         legend.text = element_text(size = 18),
-        legend.position = "bottom",
+        legend.position = c(1, 0),
+        legend.justification = c(1, 0),
+        legend.direction = "horizontal",
         legend.box.background = element_rect(colour = "black", size = 2),
-        legend.key.size = unit(3, "line")) +
+        legend.key.size = unit(2, "line")) +
   labs(color  = "Guide name", shape = "Guide name") +
-  xlab("") + ylab("Count (log)") + labs(title = "Responsiveness on Twitter (January 2010 - December 2021)")
+  xlab("Year") + ylab("Count (log)") + labs(title = "Responsiveness on Twitter per 6 months")
 
 #           Consequences
 # ======================================================
@@ -377,7 +388,7 @@ tweet.data %>%
   group_by(sentiment) %>%
   dplyr::summarise(count = n())
 
-# Consequences
+# Consequences per day
 consequences.day <- tweet.data %>%
   dplyr::group_by(agencyname, day = cut(created_at, "day"),  .drop = FALSE)  %>% 
   dplyr::count(sentiment) %>%
@@ -387,39 +398,55 @@ consequences.day <- tweet.data %>%
   dplyr::select(-`NA`) %>%
   mutate(day = format(round(as.POSIXct(day), "day")))
 
-# Remove columns
-tweet.data <- tweet.data %>%
-  dplyr::select(where(is.numeric), where(is.character), where(is.Date)) # remove non-numeric & non-character rows
+# Consequences per week
+consequences.week <- tweet.data %>%
+  dplyr::group_by(agencyname, week = cut(created_at, "week"),  .drop = FALSE)  %>% 
+  dplyr::count(sentiment) %>%
+  pivot_wider(names_from = "sentiment",
+              values_from = "n",
+              values_fill = 0) %>% 
+  dplyr::select(-`NA`) %>%
+  mutate(week = format(round(as.POSIXct(week), "day")))
 
 # ======================================================
-#           Joining dataframes
+#           Joining data with lags
 # ======================================================
+
+# Day
 
 # Join dataframes
 twitter.day <- information.day %>%
   full_join(consequences.day,  by = c("agencyname", "day")) %>%
   mutate(day = format(round(as.POSIXct(day), "day")))
-  
+
 # Load media data
 media <- read.csv("media/media_day.csv") %>%
   mutate(day = format(round(as.POSIXct(day), "day"))) %>%
   select(-X)
 
-# To do: save as .Rdata instead of csv
+# ======================================================
+#           Joining dataframes: tweet-level
+# ======================================================
 
-total.day <- twitter.day %>%
-  full_join(audience,  by = c("agencyname", "day")) %>%
-  full_join(hearing,  by = c("agencyname", "day")) %>%
-  full_join(media,  by = c("agencyname" = "acronym", "day")) %>%
-  mutate(hearing = tidyr::replace_na(hearing, 0), # Set 'hearing' to 0 when agency has never been subject of hearing
-         hearing = case_when(day > "2019-05-01" ~ NA_real_, 
-           TRUE ~ as.numeric(hearing))) %>%  # Set all values for variable 'hearing' before 01-05-2019 to NA
-        mutate_at(.vars = c("positive",
-                            "neutral",
-                            "negative",
-                            "audience_count"),
-                  funs(ifelse(joined == "no", NA, .))) %>% # Twitter variable to NA when agency was not on Twitter
-  mutate(day = format(round(as.POSIXct(day), "day")))
+#           Tweet-level
+# ======================================================
+data.tweet <- tweet.data %>%
+  select(tweet_id, conversation_id, created_at, agencyname,
+         response, response.num, short, qm.comment, attachement,
+         real.time, time.on.Twitter, year, mention, qm.agency, compound, conversations)
+
+# ======================================================
+#           Joining dataframes: agency-week panel
+# ======================================================
+# Week
+data.week <- tweet.data %>%
+  dplyr::group_by(agencyname, week = cut(created_at, "week"),  .drop = FALSE)  %>% 
+  dplyr::count(sentiment) %>%
+  pivot_wider(names_from = "sentiment",
+              values_from = "n",
+              values_fill = 0) %>% 
+  dplyr::select(-`NA`) %>%
+  mutate(week = format(round(as.POSIXct(week), "day")))
 
 # ======================================================
 #           Rolling sum/lags
@@ -427,43 +454,56 @@ total.day <- twitter.day %>%
 data.day <- all.vars %>%
   arrange(day) %>% # Arrange by day
   group_by(agencyname) %>%
-dplyr::mutate(criticism.3m = rollapplyr(negative,
-                                       list(seq(-90, -1)),
-                                       sum, fill = NA,
-                                       align = "right"),
-              praise.3m = rollapplyr(positive,
-                                    list(seq(-90, -1)),
-                                    sum, fill = NA,
-                                    align = "right"),
-              neutral.3m = rollapplyr(neutral,
-                                     list(seq(-90, -1)),
-                                     sum, fill = NA,
-                                     align = "right"),
-              valence.3m = ifelse(!(praise.3m + neutral.3m + criticism.3m),
-                                 0,
-                                 (praise.3m - criticism.3m) / (praise.3m + neutral.3m + criticism.3m)),
-              media_count.3m = rollapplyr(media,
-                                         list(seq(-90, -1)),
-                                         sum,
-                                         fill = NA,
-                                         align = "right"),
-              hearing.3m = rollapplyr(hearing,
-                                         list(seq(-90, -1)),
-                                         sum,
-                                         fill = NA,
-                                         align = "right"),
-              information.1w = rollapplyr(information,
-                                          list(seq(-7, -1)),
-                                          sum,
-                                          fill = NA,
-                                          align = "right"),
-              audience_count.1d = lag(audience_count, k = -1),
-              audience_threat.1d = lag(audience_threat, k = -1),
-              audience_silence.1d = lag(audience_silence, k = -1))
+dplyr::mutate(
+              # Valence on Twitter in past 30 days
+              criticism.30d = rollapplyr(negative, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+              praise.30d = rollapplyr(positive, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+              neutral.30d = rollapplyr(neutral, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+              valence.30d = ifelse(!(praise.30d + neutral.30d + criticism.30d), 0, (praise.30d - criticism.30d) / (praise.30d + neutral.30d + criticism.30d)),
+              
+              # Valence on Twitter in past 90 days
+              criticism.90d = rollapplyr(negative, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+              praise.90d = rollapplyr(positive, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+              neutral.90d = rollapplyr(neutral, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+              valence.90d = ifelse(!(praise.90d + neutral.90d + criticism.90d), 0, (praise.90d - criticism.90d) / (praise.90d + neutral.90d + criticism.90d)),
+              
+              # Valence on Twitter in past 365 days
+              criticism.365d = rollapplyr(negative, list(seq(-365, -1)), sum, fill = NA, align = "right"),
+              praise.365d = rollapplyr(positive, list(seq(-365, -1)), sum, fill = NA, align = "right"),
+              neutral.365d = rollapplyr(neutral, list(seq(-365, -1)), sum, fill = NA, align = "right"),
+              valence.365d = ifelse(!(praise.365d + neutral.365d + criticism.365d), 0, (praise.365d - criticism.365d) / (praise.365d + neutral.365d + criticism.365d)),
+              
+              # Media count
+              media.count.30d = rollapplyr(#media, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+              media.count.90d = rollapplyr(#media, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+              media.count.365d = rollapplyr(#media, list(seq(-365, -1)), sum, fill = NA, align = "right"),
+              
+              # Media valence
+              media.valence.30d = rollapplyr(#media, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+              media.valence.90d = rollapplyr(#media, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+              media.valence.365d = rollapplyr(#media, list(seq(-365, -1)), sum, fill = NA, align = "right"),
+              
+              # Information
+              information.1w = rollapplyr(information, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+              information.30d = rollapplyr(information, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+              information.90d = rollapplyr(information, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+              information.365d = rollapplyr(information, list(seq(-365, -1)), sum, fill = NA, align = "right"))
 
 # ======================================================
 #           Merging
 # ======================================================
+
+# Set time variables to for dates when agency was not yet on Twitter
+total.day <- twitter.day %>%
+  mutate_at(.vars = c("information",
+                      "positive",
+                      "neutral",
+                      "negative",
+                      "media_count",
+                      "media_valence"),
+            funs(ifelse(joined == "no", NA, .))) %>% # Twitter variable to NA when agency was not on Twitter
+  mutate(day = format(round(as.POSIXct(day), "day")))
+
 tweet.data <- tweet.data %>%
   mutate(day = format(round(as.POSIXct(created_at), "day")), .keep = "unused")
 

@@ -9,6 +9,7 @@ library(dplyr)
 library(ggplot2)
 library(scales)
 library(tidyr)
+library(stringr)
 
 #load documents
 load("media/media.Rdata")
@@ -22,7 +23,11 @@ tibble.to <- tibble.to[tibble.to$lang=="en",]
 # combine headings and text in media df to retrieve as many references to the agencies as possible
 media$complete_text <- paste(paste0(media$heading, "."), media$text)
 media$complete_text <- gsub("\r?\n|\r", " ", media$complete_text)
+media$complete_text <- gsub("\"", "\"", media$complete_text)
 
+
+media.decode <- media %>% filter() %>% mutate(text = HTMLdecode(text))
+media.decode$text
 ### TRIAL for media articles ###
 
 #take first 100 media articles
@@ -51,16 +56,42 @@ trial_dataframe$name <- tolower(trial_dataframe$name)
 trial_dataframe <- trial_dataframe %>%
   drop_na(score)
 
+names <- trial_dataframe %>%
+  group_by(name) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+
+agency.names <- names %>% filter(str_detect(name, "agency") == TRUE |
+                                   str_detect(name, "frontex") == TRUE)
+print(agency.names$name)
+
 # only keep matches with the agency
-agency_descriptives <- c("frontex", "border control agency", "border patrol agency", "coast guard agency", "border agency")
-trial_dataframe <- trial_dataframe[trial_dataframe$name %in% agency_descriptives,]
+agency_descriptives <- c("frontex",
+                         "frontex plus",
+                         "agency",                                                       
+                         "border agency",                                             
+                         "coast guard agency" ,                                          
+                         "border protection agency",                                    
+                         "border control agency",                                       
+                         "border management agency",                               
+                         "border patrol agency",                                        
+                         "border security agency",                                       
+                         "border-control agency",                                        
+                         "border-guard agency",                                          
+                         "border enforcement agency",                                    
+                         "border guard agency",                                          
+                         "coast-guard agency",                                           
+                         "european agency",                                              
+                         "european agency for the management of operational cooperation",
+                         "frontier agency")
+
+trial_dataframe2 <- trial_dataframe[trial_dataframe$name %in% agency_descriptives,]
 
 # introduce combined measure of magnitude and score to avoid misclassifications
 trial_dataframe$com_score <- trial_dataframe$magnitude*trial_dataframe$score
 
-ggplot(trial_dataframe, aes(x = as.factor(com_score))) +  
-  geom_bar(aes(y = (..count..)/sum(..count..))) + 
-  scale_y_continuous(labels = percent, n.breaks = 10)
+ggplot(trial_dataframe, aes(x = com_score)) +  
+  geom_histogram(colour="black", fill="white")
 
 # best approach seems to be to measure positivity and negativity separately
 # Let's take the mention with the lowest score to see differences.
@@ -72,18 +103,20 @@ trial_dataframe <- trial_dataframe %>%
             hits = n())
 
 ggplot(trial_dataframe, aes(x = com_score_mean)) +  
-  geom_histogram(colour="black", fill="white")
+  geom_histogram(colour = "black", fill = "white")
 
-#join text and score dataset
+# join text and score dataset
 media_sentiment <- left_join(media_trial, trial_dataframe, by="id")
 
-#save file
+# save file
 save(media_sentiment, file="sentiment/media_sentiment.RData")
+
 ### TRIAL for tweets ###
-#take first 100 media articles
+# Take first 10 tweets
+
 tweets_trial <- tibble.to[1:10,]
 
-#pass to gcs
+# Pass to gcs
 tweets_results <- gl_nlp(
   tweets_trial$text,
   nlp_type = "analyzeSentiment",

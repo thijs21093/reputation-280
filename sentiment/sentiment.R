@@ -27,10 +27,6 @@ media$complete_text <- paste(paste0(media$heading, "."), media$text)
 media$complete_text <- gsub("\r?\n|\r", " ", media$complete_text)
 
 media$complete_text[1]
-
-media.decode <- media %>% filter() %>% mutate(text = HTMLdecode(text))
-media.decode$text
-
 ### TRIAL for media articles ###
 
 #take first 100 media articles
@@ -94,15 +90,20 @@ trial_dataframe2 <- trial_dataframe[trial_dataframe$name %in% agency_descriptive
 trial_dataframe$com_score <- trial_dataframe$magnitude*trial_dataframe$score
 
 ggplot(trial_dataframe, aes(x = com_score)) +  
-  geom_histogram(colour="black", fill="white")
+  geom_histogram(colour = "black", fill = "white")
 
 # best approach seems to be to measure positivity and negativity separately
 # Let's take the mention with the lowest score to see differences.
 trial_dataframe <- trial_dataframe %>% 
   group_by(id) %>% 
   summarise(com_score_mean = mean(com_score),
+            com_score_median = median(com_score),
             com_score_min = min(com_score),
             com_score_max = max(com_score),
+            score_mean = mean(score),
+            com_score_median = median(score),
+            score_min = min(score),
+            score_max = max(score),
             hits = n())
 
 ggplot(trial_dataframe, aes(x = com_score_mean)) +  

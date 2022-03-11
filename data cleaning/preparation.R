@@ -556,7 +556,7 @@ response.panel <- sentiment.data %>%
            .drop = FALSE) %>%
   summarise(offset.week = n(),
             response.week = sum(response.num),
-            attachment.week = sum(attachement),
+            attachment.week = sum(attachment),
             qm.comment.week = sum(qm.comment),
             short.week = sum(short))  %>%
   mutate(week = round(as.POSIXct(week), "day"),

@@ -15,15 +15,21 @@ library(textutils)
 
 # To do's:
 ## Check negative time on Twitter
-# Count and sentiment of media variables doesn't add up (probably due to rounding)
-# Add other measure for reply.count.week variable based on own data
-# Check if all weeks are present in both panel data frame
+## Count and sentiment of media variables doesn't add up (probably due to rounding)
+## Check if all weeks are present in both panel data frame
+## Fix cases where one agency comments to an user commenting on another agency's tweet
+## Fix conversation.x and conversation.y in response2
+## split response filer: all engagement (including retweets & quotes) and without
 
 # Tweets
 load(file = "./data (not public)/from_tweets/from_tweets_2")
 load(file = "./data (not public)/to_tweets/to_tweets_2")
 
 # Media count
+load("./data (not public)/media - outputs/media_day.Rdata")
+load("./data (not public)/media - outputs/media_week.Rdata")
+
+# Media valence
 load("./data (not public)/media - outputs/media_day.Rdata")
 load("./data (not public)/media - outputs/media_week.Rdata")
 
@@ -69,7 +75,7 @@ from.agency %>%
 
 # Retweets
 retweet <- from.agency %>%
-  filter(referenced_type == "retweeted" ) # Remove retweets
+  filter(referenced_type == "retweeted") # Remove retweets
 retweet %>% nrow() # Number initial updates
 
 # Quotes
@@ -144,10 +150,9 @@ joining.date <- from.agency %>%
   select(-information)
 
 # First activity by any EU agency  
-start <- joining.date %>% 
+joining.date %>% 
   slice_min(join.day, n = 1) %>%
-  select(join.day) %>% 
-  as.character()
+  select(join.day) # 2009-03-01
 
 # ======================================================
 #           Responsiveness
@@ -193,19 +198,27 @@ conversation <- to.agency2 %>% group_by(conversation_id) %>%
 to.agency3 <- to.agency2 %>%
   full_join(conversation, by = "conversation_id")
 
+# Same message from same author
+same.message <- to.agency3 %>%
+  group_by(text, author_id) %>%
+  filter(n() > 1) %>% 
+  ungroup() %>%
+dplyr::select(tweet_id) %>% 
+  as.list()
+
 #           Adding other variables
 # ======================================================
 response <- to.agency3 %>%
+  
+  # Same message
+  dplyr::mutate(same.message = case_when(
+    tweet_id %in% same.message[["tweet_id"]] ~ 1, # Code as 1 when same text from the same author exist in data
+    !tweet_id %in% same.message[["tweet_id"]] ~ 0), # Code 0 if not
 
   # Did the agency respond?
-  dplyr::mutate(response = case_when(
-    tweet_id %in% response.filter[["referenced_id"]] ~ "response", # Code as 'response' when tweet is AT LEAST ONCE responded to
-    !tweet_id %in% response.filter[["referenced_id"]] ~ "no.response"), # Code as 'no.response' if not
-  
-  # Numeric variable
-    response.num = case_when(
-      response == "response" ~ 1,
-      response == "no.response" ~ 0),
+  response = case_when(
+    tweet_id %in% response.filter[["referenced_id"]] ~ 1, # Code as 1 when tweet is AT LEAST ONCE responded to
+    !tweet_id %in% response.filter[["referenced_id"]] ~ 0), # Code as 0 if not
   
   # short comment (<= 5 n-grams)
   text.url = str_remove_all(text, "@[[:alnum:]_]{2,}"),# Remove user
@@ -224,7 +237,7 @@ response <- to.agency3 %>%
   
   # Real time
   real.time = difftime(strptime(created_at, format = "%Y-%m-%d"),
-                   strptime(start, format = "%Y-%m-%d"),
+                   strptime("2009-03-01", format = "%Y-%m-%d"), # See above
                   units = c("days")) %>% # Number of days passed since start
     round(0) %>% # Ignore differences because of summer/winter time
     as.numeric(), # Numeric
@@ -245,7 +258,6 @@ response <- to.agency3 %>%
            weekday == "zaterdag" ~ 1, # Saturday
            weekday == "zondag" ~ 1,   # Sunday
            TRUE ~ 0))
-
 
 # ======================================================
 #           Constructing variables: from tweets
@@ -273,10 +285,8 @@ mentions <- from.agency %>%
 #           Mention/question mark
 # ======================================================
 engaging <- from.agency %>%
-  mutate(
-    
     # Does contain a mention?
-    mention = case_when(
+    mutate(mention = case_when(
       tweet_id %in% mentions[["tweet_id"]] ~ 1, # Code as 1 if tweet mentions AT LEAST one user
       !tweet_id %in% mentions[["tweet_id"]] ~ 0), # Code as 0 if not
     
@@ -286,7 +296,7 @@ engaging <- from.agency %>%
     
   # Question mark in cleaned agency tweet
   qm.agency = ifelse(grepl("\\?", text.url), 1, 0)) %>%
-  select(c(mention, qm.agency, tweet_id))
+  select(c(mention, qm.agency, tweet_id, conversations))
 
 #           Add new variables to response df
 # ======================================================
@@ -336,6 +346,9 @@ response2 %>%
 # ======================================================
 response.agency <- response2 %>% 
   group_by(response, agencyname) %>%
+  mutate(response = case_when(
+    response == 1 ~ "response",
+    response == 0 ~ "no.response")) %>%
   tally() %>% 
   tidyr::pivot_wider(names_from = response, 
                      values_from = n,
@@ -349,6 +362,9 @@ response.agency <- response2 %>%
 # ======================================================
 response.plot <- response2 %>% 
   group_by(response, agencyname, day) %>%
+  mutate(response = case_when(
+    response == 1 ~ "response",
+    response == 0 ~ "no.response")) %>%
   tally() %>% 
   tidyr::pivot_wider(names_from = response, 
                      values_from = n,
@@ -405,7 +421,7 @@ sentiment.data <- merge(sentiment,
                       response2,
                       by.y = "text",
                       by.x = "text") %>% # Merge scores with data
-  distinct() %>% # TO DO: Why are duplicates created?
+  distinct() %>% 
   mutate(sentiment = case_when(
     compound <= -0.05 ~ "twitter.criticism",
     compound > -0.05 & compound < 0.05 ~ "twitter.neutral",
@@ -512,55 +528,74 @@ twitter.day.lag <- twitter.day %>%
 # Select variable and merge with lagged data
 response.tweet <- sentiment.data %>%
   select(tweet_id, conversation_id, day, agencyname, response, short, 
-         response.num, qm.comment, attachment, real.time, year, sentiment,
-         time.on.Twitter, mention, qm.agency, conversations, url) %>%
+         response, qm.comment, attachment, real.time, year, sentiment, referenced_id,
+         time.on.Twitter, mention, qm.agency, conversations, url, 
+         #same.message
+         ) %>%
   left_join(twitter.day.lag, by = c("agencyname", 'day'))
 
 # ======================================================
 #           Joining dataframes: agency-week panel
 # ======================================================
 
-# Join dataframes with daily data
+# Join dataframes with weekly data
 twitter.week <- information.week %>%
   full_join(consequences.week,  by = c("agencyname", "week")) %>%
   full_join(media.week, by = c("agencyname", "week")) %>%
   full_join(media.sentiment.week,  by = c("agencyname", "week")) %>%
   full_join(joining.date, by = "agencyname")
 
-# From agency variables
-agency.week <- engaging %>%
-  full_join(from.agency, 
-            by = c("tweet_id")) %>%
-  unnest(cols = public_metrics, # Unnest attachment
-         keep_empty = TRUE) %>%
+
+#           Conversation variables
+# ======================================================
+conversation.week <- from.agency %>%
+  left_join(conversation, by = "conversation_id") %>% 
+  mutate(conversations = conversations %>%  tidyr::replace_na(0)) %>%  # NA to 0 -> No match means no replies, so conversation size is 0
+  group_by(conversation_id, agencyname) %>% # Aggregate to conversation level
+  summarise(conversations.mean = mean(conversations),
+            created_at = min(created_at)) %>% # Time at first tweet in thread
   group_by(agencyname,
            week = cut(created_at, "week"),
            .drop = FALSE) %>%
-  dplyr::summarize(information.week = n(),
-            mention.week = sum(mention),
-            qm.agency.week = sum(qm.agency),
-            # Note: slightly different than in tweet-level data.
-            # This variable is constructed from Twitter's metrics and 
-            # therefore also includes, for example, non-English tweets
-            reply.count.week = sum(reply_count)) %>%
+  dplyr::summarize(conversations.week = sum(conversations.mean))
+
+#           From agency variables
+# ======================================================
+agency.week <- from.agency %>%
+  right_join(information, # Check 
+            by = "tweet_id") %>%
+  group_by(agencyname,
+           week = cut(created_at, "week"),
+           .drop = FALSE) %>%
+  dplyr::summarize(mention.week = sum(mention),
+            qm.agency.week = sum(qm.agency)) %>%
+  full_join(conversation.week, 
+            by = c("agencyname", "week")) %>%
+  full_join(information.week, 
+            by = c("agencyname", "week"))
   mutate(week = round(as.POSIXct(week), "day"),
          mention.ratio = ifelse(!(information.week), 0, (mention.week/information.week)),
          qm.agency.ratio = ifelse(!(information.week), 0, (qm.agency.week/information.week)),
-         reply.count.ratio = ifelse(!(information.week), 0, (reply.count.week/information.week))) %>%
+         conversations.ratio = ifelse(!(information.week), 0, (conversations.week/information.week))) %>%
   select(-information.week)
 
 # Week
 response.panel <- sentiment.data %>%
+  mutate(response = case_when(
+    response == 1 ~ "response",
+    response == 0 ~ "no.response")) %>%
   group_by(agencyname,
            week = cut(day, "week"),
            .drop = FALSE) %>%
   summarise(offset.week = n(),
-            response.week = sum(response.num),
+            response.week = sum(response),
+            same.message.week = sum(same.message),
             attachment.week = sum(attachment),
             qm.comment.week = sum(qm.comment),
             short.week = sum(short))  %>%
   mutate(week = round(as.POSIXct(week), "day"),
          attachment.ratio = ifelse(!(offset.week), 0, (attachment.week/offset.week)),
+         same.message.ratio = ifelse(!(offset.week), 0, (same.message.week/offset.week)),
          qm.comment.ratio = ifelse(!(offset.week), 0, (qm.comment.week/offset.week)),
          short.ratio = ifelse(!(offset.week), 0, (short.week/offset.week))) %>%
   left_join(twitter.week, by = c("agencyname", 'week')) %>% 

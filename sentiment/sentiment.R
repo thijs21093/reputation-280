@@ -10,6 +10,8 @@ library(ggplot2)
 library(scales)
 library(tidyr)
 library(stringr)
+library(tm)
+
 
 #load documents
 load("media/media.Rdata")
@@ -23,11 +25,12 @@ tibble.to <- tibble.to[tibble.to$lang=="en",]
 # combine headings and text in media df to retrieve as many references to the agencies as possible
 media$complete_text <- paste(paste0(media$heading, "."), media$text)
 media$complete_text <- gsub("\r?\n|\r", " ", media$complete_text)
-media$complete_text <- gsub("\"", "\"", media$complete_text)
 
+media$complete_text[1]
 
 media.decode <- media %>% filter() %>% mutate(text = HTMLdecode(text))
 media.decode$text
+
 ### TRIAL for media articles ###
 
 #take first 100 media articles

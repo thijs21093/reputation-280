@@ -3,6 +3,9 @@ library(dplyr)
 library(tidyr)
 library(lubridate)
 
+# Set time zone
+Sys.setenv(TZ = 'GMT')
+
 # ======================================================
 #           From agencies
 # ======================================================

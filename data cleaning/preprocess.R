@@ -20,21 +20,7 @@ for (i in seq(alltweets)){
 dfs <- sapply(.GlobalEnv, is.data.frame) # Find dataframes in enviroment
 df <- bind_rows(mget(names(dfs)[dfs])) # Bind dataframes
 
-
-# Manipulation NOTE: THIJS VERSION, DOES NOT WORK FOR MORITZ
-tibble.from <-  df %>%
-  as_tibble() %>% # As tibble
-  rename(tweet_id = id) %>% # rename to avoid conflicting names
-  unnest(cols = referenced_tweets, # Note: Some tweets are both quotes and replies to statuses.
-         keep_empty = TRUE) %>%    # For these tweets, a second row is created when unnesting referenced_tweets.
-  rename(referenced_id = id,     # The duplicate will later be deleted when filtering out quotes.
-         referenced_type = type) %>%
-  mutate(
-    referenced_type = tidyr::replace_na(referenced_type, "no reference"),
-    text = textutils::HTMLdecode(text))%>% # Decode html
-  unnest(cols = attachments, # Unnest attachment
-         keep_empty = TRUE)
-
+# Thijs: added a line which changes time zone to GMT
 # Manipulation MORITZ VERSION
 tibble.from <-  df %>%
   as_tibble() %>% # As tibble
@@ -44,7 +30,8 @@ tibble.from <-  df %>%
   distinct(tweet_id, .keep_all = TRUE) %>% # TO DO: why are duplicates created?
   rename(referenced_id = id,
   referenced_type = type) %>% # Unnesting referenced tweets
-  mutate(referenced_type = replace_na(referenced_type, "no reference"))
+  mutate(referenced_type = replace_na(referenced_type, "no reference"),
+         created_at = with_tz(created_at, "GMT"))
 
 tibble.from %>%
   group_by(referenced_type) %>%
@@ -77,6 +64,7 @@ tibble.to <-  df.to %>%
          keep_empty = TRUE) %>%    # For these tweets, a second row is created when unnesting referenced_tweets.
   rename(referenced_id = id,     # The duplicate will later be deleted when filtering out quotes.
          referenced_type = type) %>% 
-  mutate(referenced_type = tidyr::replace_na(referenced_type, "no reference"))
+  mutate(referenced_type = tidyr::replace_na(referenced_type, "no reference"),
+         created_at = with_tz(created_at, "GMT"))
 
 save(tibble.to, file = "to_tweets_2")

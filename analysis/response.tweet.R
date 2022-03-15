@@ -5,54 +5,36 @@ library(ggplot2)
 library(ggthemes)
 library(sjmisc)
 library(kableExtra)
-library(misty)
-library(multcomp)
-library(GLMMadaptive)
-library(effects)
 library(sjPlot)
 library(lme4)
 library(multilevel)
 library(lmtest)
-library(sandwich)
-library(merDeriv)
-library(lfe)
 library(fixest)
+library(panelr)
 library(modelsummary)
-library(jtools)
 
-# TO DO: move code chunk to other script
-# TO DO: add attachement do dataset
-# TO DO: check replies that don't start with "@"
-
-load("./data/data_day.Rda")
+load("./data/response_tweet.Rda")
+load("./data/response_panel.Rda")
 
 # ======================================================
-#           Centering, transformation & description
+#           Centering, transformation & description: cross-sectional
 # ======================================================
 
+# Transformation: 
+# ======================================================
+response.tweet <- response.tweet %>%
+  dplyr::mutate(conversations.log = log(conversations),
+         media.count.30d.log = log(media.count.30d + 1),
+         media.count.90d.log = log(media.count.90d + 1),
+         media.count.365d.log = log(media.count.365d + 1),
+         information.1w.log = log(information.1w + 1),
+         information.30d.log = log(information.30d + 1),
+         information.90d.log = log(information.90d + 1))
+  
 # Centering & transformation: cross-sectional
 # ======================================================
-reg <- data.merge %>%
-  mutate(valence.3m.s  = scale(valence.3m),
-      media_count.3m.s  = scale(media_count.3m), 
-      conversations.s = scale(conversations)) # Scale continious variables.
-
-x <- c("response.num",
-       "time",
-       "valence.3m",
-       "media_count.3m",
-       "question.mark",
-       "length",
-       "conversations")
-
-var.table <- reg %>%
-  dplyr::select(c(response.num,
-                  time,
-                  valence.3m,
-                  media_count.3m,
-                  question.mark,
-                  length,
-                  conversations)) %>%
+var.table.t <- response.tweet %>% 
+  dplyr::select(where(is.numeric)) %>%
   descr() %>% 
   data.frame() %>% 
   dplyr::select(-type,
@@ -61,20 +43,11 @@ var.table <- reg %>%
                 -se,
                 -trimmed,
                 -iqr) %>%
-  mutate_at(vars(c("mean","sd","md")),funs(round(.,3))) %>%
-  slice(match(x, label)) %>% dplyr::select(-label)
+  mutate_at(vars(c("mean","sd","md")),funs(round(.,3)))
 
-var.label <- c("Response",
-               "Time (days)",
-               "Valence, prev. 3 months",
-               "Media count, prev 3 months",
-               "Question mark",
-               "Length",
-               "Length of conservation")
-
-row.names(var.table) <- var.label
-var.table %>%
-  kable(col.names = c("n",
+var.table.t %>%
+  kable(col.names = c("Var",
+                       "n",
                       "Mean",
                       "SD",
                       "Median",
@@ -84,18 +57,13 @@ var.table %>%
                 full_width = F,
                 position = "left")
 
-# Centering & transformation: panel
+# Which agencies have been most responsive?
 # ======================================================
-
-
-
-# How often do agencies repond?
-# ======================================================
-reg %>%
-group_by(agencyname) %>%
+response.tweet %>%
+  group_by(agencyname) %>%
   summarize(total = n(),
-            response = sum(response.num == 1),
-            prop = sum(response.num == 1) / n()) %>%
+            response = sum(response == 1),
+            prop = response / total) %>%
   arrange(desc(prop)) %>%
   kable(col.names = c("Agency",
                       "Total",
@@ -104,75 +72,102 @@ group_by(agencyname) %>%
         digits = 3) %>% 
   kable_styling(bootstrap_options = c("condensed"),
                 full_width = F,
-                position = "left")
-
+                position = "left") 
 
 
 # ======================================================
 #           Cross-sectional fixed effect
 # ======================================================
 
-# NOTE: for model comparison, check if models have the same number of observations
-
-# Note: specify drop_na() in formula:
-# If using 3 months lag, set drop_na(support.3m)
-# # If using 1 month lag, set drop_na(support.1m), etc.
-
 # Model 1.0: Main IVs
-f1.0 <- feglm(response.num ~ 
-                valence.3m + 
-                media_count.3m,
+
+# 90 days
+f1.0 <- feglm(response ~ 
+                twitter.valence.90d + 
+                media.valence.90d +
+                media.count.90d,
               family = "logit",
-              data = reg) 
+              data = response.tweet) 
 
 summary(f1.0)
 
-# Model 1.1: Adding controls except time since joining Twitter
+# Model 1.1: Adding controls without missing
 f1.1 <- update(f1.0, . ~ . +
-                 i(sentiment, ref = "neutral") +
-                 i(weekend, ref = "weekday") + 
-                 length + 
-                 question.mark + 
-                 conversations,
-              family = "logit",
-              data = reg) 
+                 short +
+                 qm.comment +
+                 attachment +
+                 conversations +
+                 same.message	+
+                 information.1w	+
+                 i(sentiment, ref = "twitter.neutral") +
+                 weekend,
+              family = "logit") 
 
 summary(f1.1)
 
-# Model 1.2: adding time since joining data
-# f1.2 <- update(f1.1 , . ~ . + )
+# Model 1.2: agency fixed effects
+f1.2 <- feglm(response ~ 
+              twitter.valence.90d + 
+              media.valence.90d +
+              media.count.90d +
+              short +
+              qm.comment +
+              attachment +
+              conversations +
+              same.message	+
+              information.1w	+
+              i(sentiment, ref = "twitter.neutral") | 
+              agencyname,
+              family = "logit",
+              data = response.tweet) 
 
-summary(f1.2)
 
-# Model 1.3: agency fixed effects
-
-f1.3 <- feglm(response.num ~ 
-                valence.3m + 
-                media_count.3m +
-                i(sentiment, ref = "neutral") +
-                i(weekend, ref = "weekday") + 
-                length + 
-                question.mark + 
-                conversations |
-                agencyname,
-                family = "logit",
-                data = reg)
-summary(f1.3)
-
-# Model 1.4: time as FE effect
-f1.4 <- feglm(response.num ~ 
-                valence.3m + 
-                media_count.3m +
-                i(sentiment, ref = "neutral") +
-                i(weekend, ref = "weekday") + 
-                length + 
-                question.mark + 
-                conversations |
+# Model 1.3: agency and year fixed effects
+f1.3 <- feglm(response ~ 
+                twitter.valence.90d + 
+                media.valence.90d +
+                media.count.90d +
+                short +
+                qm.comment +
+                attachment +
+                conversations +
+                same.message	+
+                information.1w	+
+                i(sentiment, ref = "twitter.neutral") | 
                 agencyname + year,
               family = "logit",
-              data = reg)
+              data = response.tweet) 
 
-summary(f1.4)
+
+# Model 1.4: agency x year fixed effects
+f1.4 <- feglm(response ~ 
+                twitter.valence.90d + 
+                media.valence.90d +
+                media.count.90d +
+                short +
+                qm.comment +
+                attachment +
+                conversations +
+                same.message	+
+                information.1w	+
+                i(sentiment, ref = "twitter.neutral") | 
+                agencyname^year,
+              family = "logit",
+              data = response.tweet) 
+
+etable(f1.2, f1.3, f1.4, order = "f", drop = "Int")
+
+# Model 1.5: time on Twitter as FE effect
+f1.3 <- update(f1.2,  . ~ . +
+                poly(time.on.Twitter, 2))
+
+summary(f1.3)
+
+# Model 1.3: time on Twitter as FE effect
+f1.4 <- update(f1.2,  . ~ . +
+                 time.on.Twitter)
+
+summary(f1.3)
 
 # Model 1.5: time x agency interaction as FE effect
 f1.5 <- feglm(response.num ~ 
@@ -219,6 +214,16 @@ f1.8 <- update(f1.5, cluster = ~ year^agencyname,
                data = reg)
 
 summary(f1.8)
+
+
+# Model 1.2: Adding controls with missing
+f1.2 <- update(f1.1, . ~ . +
+                 mention +
+                 qm.agency +
+                 weekend,
+               family = "logit") 
+
+summary(f1.1)
 
 # Model comparison
 etable(f1.4, f1.7, f1.8)

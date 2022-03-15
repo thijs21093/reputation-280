@@ -551,8 +551,8 @@ twitter.day.lag <- twitter.day %>%
 
 # Select variable and merge with lagged data
 response.tweet <- sentiment.data %>%
-  select(tweet_id, conversation_id, day, agencyname, response, short, 
-         response, qm.comment, attachment, real.time, year, sentiment, referenced_id,
+  dplyr::select(tweet_id, conversation_id, day, agencyname, response, short, weekend,
+         response, qm.comment, attachment, real.time, year, month, sentiment, referenced_id,
          time.on.Twitter, mention, qm.agency, conversations, url, same.message) %>%
   left_join(twitter.day.lag, by = c("agencyname", 'day'))
 
@@ -592,19 +592,20 @@ response.panel <- sentiment.data %>%
             same.message.week = sum(same.message),
             attachment.week = sum(attachment),
             qm.comment.week = sum(qm.comment),
+            weekend.week = sum(weekend),
             short.week = sum(short))  %>%
   mutate(week = as.POSIXct(week),
          attachment.ratio = ifelse(!(offset.week), 0, (attachment.week/offset.week)),
          same.message.ratio = ifelse(!(offset.week), 0, (same.message.week/offset.week)),
          qm.comment.ratio = ifelse(!(offset.week), 0, (qm.comment.week/offset.week)),
-         short.ratio = ifelse(!(offset.week), 0, (short.week/offset.week))) %>%
+         short.ratio = ifelse(!(offset.week), 0, (short.week/offset.week)),
+         weekend.ratio =  ifelse(!(offset.week), 0, (weekend.week/offset.week))) %>%
   left_join(twitter.week, by = c("agencyname", 'week')) %>% 
   left_join(agency.week, by = c("agencyname", 'week')) %>% 
   mutate(time.on.Twitter = difftime(strptime(week, format = "%Y-%m-%d"),
                              strptime(join.day, format = "%Y-%m-%d"), units = c("weeks")) %>% as.numeric(),
          twitter.valence = twitter.praise - twitter.criticism) %>%
   filter(time.on.Twitter >= 0)
-
 
 #           A look at the distribution
 # ======================================================

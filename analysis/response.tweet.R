@@ -5,35 +5,39 @@ library(ggplot2)
 library(ggthemes)
 library(sjmisc)
 library(kableExtra)
-library(sjPlot)
-library(lme4)
-library(multilevel)
-library(lmtest)
 library(fixest)
-library(panelr)
 library(modelsummary)
+library(GLMMadaptive)
+library(performance)
+library(parameters)
 
 load("./data/response_tweet.Rda")
-load("./data/response_panel.Rda")
+
+# Set time zone
+Sys.setenv(TZ = 'GMT')
 
 # ======================================================
 #           Centering, transformation & description: cross-sectional
 # ======================================================
 
-# Transformation: 
+# Transformation
 # ======================================================
-response.tweet <- response.tweet %>%
+response.data <- response.tweet %>%
+  filter(same.message == 0 &
+         time.on.Twitter >= 0) %>%
   dplyr::mutate(conversations.log = log(conversations),
          media.count.30d.log = log(media.count.30d + 1),
          media.count.90d.log = log(media.count.90d + 1),
          media.count.365d.log = log(media.count.365d + 1),
          information.1w.log = log(information.1w + 1),
          information.30d.log = log(information.30d + 1),
-         information.90d.log = log(information.90d + 1))
+         information.90d.log = log(information.90d + 1),
+         time.on.Twitter.s = time.on.Twitter/365,
+         time.on.Twitter.s2 = time.on.Twitter.s^2)
   
 # Centering & transformation: cross-sectional
 # ======================================================
-var.table.t <- response.tweet %>% 
+var.table.t <- response.data %>% 
   dplyr::select(where(is.numeric)) %>%
   descr() %>% 
   data.frame() %>% 
@@ -59,7 +63,7 @@ var.table.t %>%
 
 # Which agencies have been most responsive?
 # ======================================================
-response.tweet %>%
+response.data %>%
   group_by(agencyname) %>%
   summarize(total = n(),
             response = sum(response == 1),
@@ -74,7 +78,6 @@ response.tweet %>%
                 full_width = F,
                 position = "left") 
 
-
 # ======================================================
 #           Cross-sectional fixed effect
 # ======================================================
@@ -85,466 +88,238 @@ response.tweet %>%
 f1.0 <- feglm(response ~ 
                 twitter.valence.90d + 
                 media.valence.90d +
-                media.count.90d,
+                media.count.90d.log, # Log doesn't improve fit with agency*year FE, but it does with agency FE and agency-year FE
               family = "logit",
-              data = response.tweet) 
-
-summary(f1.0)
+              data = response.data) 
 
 # Model 1.1: Adding controls without missing
 f1.1 <- update(f1.0, . ~ . +
                  short +
                  qm.comment +
                  attachment +
-                 conversations +
-                 same.message	+
-                 information.1w	+
+                 conversations.log + # Log much better with agency-year and agency*year FE
+                 information.90d	+ # 90 days instead of 30 days doesn't matter with agency*year FE, but it improve fit with agency FE and agency-year FE 
                  i(sentiment, ref = "twitter.neutral") +
                  weekend,
               family = "logit") 
 
-summary(f1.1)
+etable(f1.0, f1.1,
+       fitstat = ~ . + ll + aic) # Fit statistics
 
 # Model 1.2: agency fixed effects
-f1.2 <- feglm(response ~ 
-              twitter.valence.90d + 
+f1.2 <- feglm(response ~ twitter.valence.90d + 
               media.valence.90d +
-              media.count.90d +
+              media.count.90d.log +
               short +
               qm.comment +
               attachment +
-              conversations +
-              same.message	+
-              information.1w	+
-              i(sentiment, ref = "twitter.neutral") | 
+              conversations.log +
+              information.90d	+ 
+              i(sentiment, ref = "twitter.neutral") + 
+              weekend | 
               agencyname,
               family = "logit",
-              data = response.tweet) 
-
+              data = response.data) 
 
 # Model 1.3: agency and year fixed effects
 f1.3 <- feglm(response ~ 
                 twitter.valence.90d + 
                 media.valence.90d +
-                media.count.90d +
+                media.count.90d.log +
                 short +
                 qm.comment +
                 attachment +
-                conversations +
-                same.message	+
-                information.1w	+
-                i(sentiment, ref = "twitter.neutral") | 
+                conversations.log +
+                information.90d	+
+                i(sentiment, ref = "twitter.neutral") +
+                weekend | 
                 agencyname + year,
               family = "logit",
-              data = response.tweet) 
+              data = response.data) 
 
-
-# Model 1.4: agency x year fixed effects
+# Model 1.4: time x agency interaction as FE effect
 f1.4 <- feglm(response ~ 
                 twitter.valence.90d + 
                 media.valence.90d +
-                media.count.90d +
+                media.count.90d.log +
                 short +
                 qm.comment +
                 attachment +
-                conversations +
-                same.message	+
-                information.1w	+
-                i(sentiment, ref = "twitter.neutral") | 
+                conversations.log +
+                information.90d	+
+                i(sentiment, ref = "twitter.neutral") +
+                weekend | 
                 agencyname^year,
               family = "logit",
-              data = response.tweet) 
+              data = response.data) 
 
-etable(f1.2, f1.3, f1.4, order = "f", drop = "Int")
+# Testing transformation
 
-# Model 1.5: time on Twitter as FE effect
-f1.3 <- update(f1.2,  . ~ . +
-                poly(time.on.Twitter, 2))
+# Extract dataframe from model 1.4 and rerun 1.2 and 1.3 with that data
+obs.removed <- f1.4$obs_selection$obsRemoved
+data.removed <- response.data[(obs.removed),]
 
-summary(f1.3)
+# Agency FE
+f1.2m <- update(f1.2, . ~ . , data = data.removed) 
+f1.2c <- update(f1.2m, . ~ . - information.90d + information.30d) 
 
-# Model 1.3: time on Twitter as FE effect
-f1.4 <- update(f1.2,  . ~ . +
-                 time.on.Twitter)
+etable(f1.2m, f1.2c, fitstat = ~ . + ll + aic)
 
-summary(f1.3)
+# Agency-year FE
+f1.3m <- update(f1.3, . ~ . , data = data.removed) 
+f1.3c <- update(f1.3m, . ~ . - information.90d + information.30d) 
+etable(f1.3m, f1.3c, fitstat = ~ . + ll + aic) 
 
-# Model 1.5: time x agency interaction as FE effect
-f1.5 <- feglm(response.num ~ 
-                valence.3m + 
-                media_count.3m +
-                i(sentiment, ref = "neutral") +
-                i(weekend, ref = "weekday") + 
-                length + 
-                question.mark + 
-                conversations |
-                agencyname^year,
-              family = "logit",
-              data = reg)
-
-summary(f1.5)
-
-# Model 1.6: Continuous real  time as random slope
-f1.6 <- feglm(response.num ~ 
-                valence.3m + 
-                media_count.3m +
-                i(sentiment, ref = "neutral") +
-                i(weekend, ref = "weekday") + 
-                length + 
-                question.mark + 
-                conversations |
-                agencyname[time],
-              family = "logit",
-              data = reg)
-
-summary(f1.6)
-
-# Select model with best fit
-
-# Model 1.7: conversation as cluster
-f1.7 <- update(f1.4, cluster = ~ conversation_id,
-              family = "logit",
-              data = reg)
-
-summary(f1.7)
-
-# Model 1.8: Time & agency as cluster
-f1.8 <- update(f1.5, cluster = ~ year^agencyname,
-               family = "logit",
-               data = reg)
-
-summary(f1.8)
-
-
-# Model 1.2: Adding controls with missing
-f1.2 <- update(f1.1, . ~ . +
-                 mention +
-                 qm.agency +
-                 weekend,
-               family = "logit") 
-
-summary(f1.1)
+# Agency x year FE
+f1.4c <- update(f1.4, . ~ . - information.90d + information.30d)
+etable(f1.4, f1.4c, fitstat = ~ . + ll + aic) # Fit statistics
 
 # Model comparison
-etable(f1.4, f1.7, f1.8)
+etable(f1.2m, f1.3m, f1.4,
+       fitstat = ~ . + ll + aic) # Fit statistics
 
-# Look at fixed effects
-fp1.4 <- fixef(f1.4)
-plot(fp1.4)
+# Which model has the best fit indices?
+# Model 1.3
 
-fp1.7 <- fixef(f1.7)
-plot(fp1.7)
+# Model 1.5: Adding time on Twitter
+f1.5 <- update(f1.2m,  . ~ . + time.on.Twitter.s)
 
-fp1.8 <- fixef(f1.8)
-plot(fp1.8)
+etable(f1.2m, f1.5, fitstat = ~ . + ll + aic) # Much better fit
+
+f1.5.rawpoly <- update(f1.2m,  . ~ . + poly(time.on.Twitter.s, 2, raw = TRUE)) # Centering? 
+f1.5.orgpoly <- update(f1.2m,  . ~ . + poly(time.on.Twitter.s, 2))
+f1.5alt <- update(f1.2m,  . ~ . + time.on.Twitter.s + time.on.Twitter.s2)
+
+etable(f1.5, f1.5.rawpoly, f1.5.orgpoly, fitstat = ~ . + ll + aic) # Second order polynomials are n.s
+
+# Model 1.7: Continuous time on Twitter as random slope
+f1.7 <- feglm(response ~ 
+                twitter.valence.90d + 
+                media.valence.90d +
+                media.count.90d.log +
+                short +
+                qm.comment +
+                attachment +
+                conversations.log +
+                information.90d	+ 
+                i(sentiment, ref = "twitter.neutral") + 
+                weekend |
+                agencyname[time.on.Twitter.s],
+              family = "logit",
+              data = data.removed)
+
+etable(f1.5, f1.7, fitstat = ~ . + ll + aic)  # Big importoment in terms of AIC/LL, but slightly worse BIC
+
+# Model 1.8: Continuous time on Twitter + poly as random slope
+f1.8 <- feglm(response ~ 
+                twitter.valence.90d + 
+                media.valence.90d +
+                media.count.90d.log +
+                short +
+                qm.comment +
+                attachment +
+                conversations.log +
+                information.90d	+ 
+                i(sentiment, ref = "twitter.neutral") + 
+                weekend |
+                agencyname[time.on.Twitter.s, time.on.Twitter.s2],
+              family = "logit",
+              data = data.removed)
+
+etable(f1.7, f1.8, fitstat = ~ . + ll + aic)  # Only one varying slope seems to be most parsimonious
+
+# Select model with best fit
+etable(f1.3, f1.7, fitstat = ~ . + ll + aic) # Again, varying slope outperforms agency FE + year FE
+
+# Try different lags
+f1.7month <- update(f1.7, . ~ . - 
+                      twitter.valence.90d - 
+                      media.valence.90d -
+                      media.count.90d.log +
+                      twitter.valence.30d + 
+                      media.valence.30d +
+                      media.count.30d.log)
+
+f1.7year <- update(f1.7, . ~ . - 
+                      twitter.valence.90d - 
+                      media.valence.90d -
+                      media.count.90d.log +
+                      twitter.valence.365d + 
+                      media.valence.365d +
+                      media.count.365d.log)
+
+obs.removed2 <- f1.7year$obs_selection$obsRemoved
+data.removed2 <- data.removed[(obs.removed2),]
+
+f1.7m <- update(f1.7, . ~ . , data = data.removed2)
+f1.7monthm <- update(f1.7month, . ~ . , data = data.removed2)
+
+etable(f1.7m, f1.7monthm, f1.7year, fitstat = ~ . + ll + aic) # Year seems best
+
+# Model 1.8: Adding controls with some missingness
+f1.8 <- update(f1.7year, . ~ . +
+                mention +
+                qm.agency,
+                data = response.data) 
+
+etable(f1.8, fitstat = ~ . + ll + aic)
+
+# Clustering
+
+# Model 1.8: conversation as cluster
+f1.8.conversation <- update(f1.8, cluster = ~ conversation_id)
+f1.8.agencyyear <- update(f1.8, cluster = ~ agencyname^year)
+
+etable(f1.8, f1.8.conversation, f1.8.agencyyear, fitstat = ~ . + ll + aic)
+
+# Model evaluation
+
+# A look at the fixed effects
+f1.8.plot <- fixef(f1.8)
+plot(f1.8.plot)
+
+# Heterogeneity
+obs.removed3 <- f1.8$obs_selection$obsRemoved
+data.removed3 <- response.data[(obs.removed3),]
+
+data.demean <- cbind(
+  data.removed3,
+  datawizard::demean(data.removed3,
+                     select = c("twitter.valence.365d", "media.valence.365d", "media.count.365d.log",
+                    "short", "qm.comment", "attachment", "conversations.log", "sentiment", "information.90d", "weekend", "mention", "qm.agency"), group = "agencyname"))
+# https://easystats.github.io/datawizard/reference/demean.html
 
 # Quick export
-modelsummary(f1.4)
+# Add info on varying slope
 
-# ======================================================
-#           Random effects
-# ======================================================
-
-# To do: check polynomial for time
-
-# Model 3.0: Empty model
-l3.0 <- glm(response.num ~ 1,
-              na.action = na.omit,
-              data = reg,
-              family = binomial(link = "logit"))
-
-summary(l3.0)
-
-# Model 3.3: Adding level-1 variables
-l3.1 <- update(l3.0, . ~ . +
-                 sentiment +
-                 weekend + 
-                 length + 
-                 question.mark)
-summary(l3.1)
-anova(l3.1)
-
-# Model 3.2: Adding level-2 controls
-l3.2 <- update(l3.1, . ~ . +
-                 time.1000 +
-                 valence.3m + 
-                 media_count.3m +
-                 conversations)
-summary(l3.2)
-anova(l3.2)
-
-# Model 3.3: Adding conversation as random effect
-l3.3 <- glmer(response.num ~ 
-                sentiment + 
-                weekend + 
-                question.mark + 
-                valence.3m.s + 
-                media_count.3m.s + 
-                conversations.s +
-                (1 | agencyname),
-              na.action = na.omit,
-              data = reg %>% filter(agencyname != "EIOPA"),
-              family = binomial(link = "logit"))
-
-summary(l3.3)
-performance::icc(l3.3)
-anova(l3.2, l3.3)
-
-# Model 3.4: Adding conversation as random effect
-l3.4 <- update(l3.3, . ~ . -
-                 (1 | agencyname) +
-                 (1 |conversation_id))
-
-summary(l3.4)
-performance::icc(l3.4)
-anova(l3.2, l3.4)
-
-# Model 3.5: Adding agency as third level
-l3.5 <- update(l3.3, . ~ . + (1 | agencyname:conversation_id))
-
-summary(l3.5)
-performance::icc(l3.5, by_group = TRUE) # Variance by group
-
-anova(l3.3, l3.5)
-
-# Model 3.6: Agency as FE instead of RE
-l3.6 <- update(l3.4, . ~ . + 
-                 agencyname)
-
-summary(l3.6)
-performance::icc(l3.6) 
-
-anova(l3.4, l3.6)
-
-summary(l3.6)
+models <- list(
+  "Model 1.1 (cluster = agency)" = feglm(fml = response ~ twitter.valence.365d + media.valence.365d + media.count.365d.log |
+                    agencyname + agencyname[[time.on.Twitter.s]], 
+                    data = response.data, family = binomial(link = "logit")),
+  "Model 2.1 (cluster = conversation)" = feglm(fml = response ~ twitter.valence.365d + media.valence.365d + media.count.365d.log | 
+                    agencyname + agencyname[[time.on.Twitter.s]], 
+                    data = response.data, family = binomial(link = "logit"), cluster = ~conversation_id),
+  "Model 3.1 (cluster = agency-year)" = feglm(fml = response ~ twitter.valence.365d + media.valence.365d + media.count.365d.log |
+                    agencyname + agencyname[time.on.Twitter.s], 
+                    data = response.data, family = binomial(link = "logit"), cluster = ~agencyname^year),
+  "Model 1.2 (cluster = agency)" = feglm(fml = response ~ twitter.valence.365d + media.valence.365d + media.count.365d.log +
+                      short + qm.comment + attachment + conversations.log + information.90d + i(sentiment, ref = "twitter.neutral") + weekend + mention + qm.agency | 
+                      agencyname + agencyname[[time.on.Twitter.s]], 
+                    data = response.data, family = binomial(link = "logit")),
+  "Model 2.2 (cluster = conversation)" = feglm(fml = response ~ twitter.valence.365d + media.valence.365d + media.count.365d.log + 
+                      short + qm.comment + attachment + conversations.log + information.90d + i(sentiment, ref = "twitter.neutral") + weekend + mention + qm.agency |
+                      agencyname + agencyname[[time.on.Twitter.s]], 
+                    data = response.data, family = binomial(link = "logit"), cluster = ~conversation_id),
+  "Model 3.2 (cluster = agency-year)" = feglm(fml = response ~ twitter.valence.365d + media.valence.365d + media.count.365d.log +
+                      short + qm.comment + attachment + conversations.log + information.90d + i(sentiment, ref = "twitter.neutral") + weekend + mention + qm.agency |
+                      agencyname + agencyname[[time.on.Twitter.s]], 
+                    data = response.data, family = binomial(link = "logit"), cluster = ~agencyname^year))
 
 
-# ======================================================
-#           Panel agency-by-week
-# ======================================================
-
-m1.0 <- pglm(information ~ 
-               lag(information.cgm) +
-               lag(information.cgm,  12),
-             data = pdata,
-             model = "within",
-             family = "negbin")
-
-summary(m1.0)
-
-m1.1 <- update(m1.0, . ~ . +
-                 audience_count.lcgm +
-                 audience_threat.cgm +
-                 lag(audience_count.lcgm) +
-                 lag(audience_threat.cgm))
-
-summary(m1.1)
-
-m1.2 <- update(m1.0, . ~ . +
-                 media_count.lcgm +
-                 lag(media_count.lcgm) +
-                 media_count.cgm +
-                 lag(media_count.cgm) +
-                 media_count.3.cgm +
-                 media_count.12.cgm +
-                 media_threat.cgm +
-                 lag(media_threat.cgm))
-summary(m1.2)
-
-m1.3 <- update(m1.0, . ~ . +
-                 valence.3 + 
-                 valence.12) # No effect...
-
-summary(m1.3)
-
-# m1.4 <- update(m1.0, . ~ . +
-#                 hearing +
-#                 lag(hearing)) # Needs fixing, see above
-
-# summary(m1.4)
-
-m1.5 <- update(m1.0, . ~ . +
-                 lag(audience_count.lcgm) +
-                 lag(audience_threat.cgm) +
-                 valence.3.cgm +
-                 valence.3.cgm:lag(audience_count.lcgm),
-               valence.3.cgm:lag(audience_threat.cgm))
-
-summary(m1.5)
-
-m1.6 <- update(m1.0, . ~ . +
-                 media_count.lcgm +
-                 valence.3.cgm +
-                 valence.3.cgm:media_count.lcgm)
-summary(m1.6)
-
-m1.7 <- update(m1.0, . ~ . +
-                 media_count.lcgm +
-                 valence.3.cgm +
-                 lag(audience_count.lcgm) +
-                 valence.3.cgm:media_count.lcgm +
-                 valence.3.cgm:lag(audience_count.lcgm))
-summary(m1.7)
-
-m1.8 <- update(m1.7, . ~ . +
-                 lag(audience_threat.cgm))
-
-summary(m1.8)
-
-f1.8a <- information ~
-  lag(information) +
-  lag(information, 12) + 
-  valence.3 +
-  media_count.l +
-  lag(audience_count.l) +
-  valence.3.cwc:media_count.lcwc +
-  lag(audience_count.lcwc):valence.3.cwc +
-  lag(audience_threat)
-
-# Note:
-## lag of 1: p = 0.075
-## media_count.3: p = 0.13
-## media_count.12: p = 0.022
-# Note: valence.3:lag(audience_threat) = n.s.
-
-# Getting marginal effects
-
-m1.8a <- pglm(f1.8a,
-              data = pdata,
-              family = 'negbin', 
-              model = "within")
-
-summary(m1.8a)
-
-# See https://github.com/benjaminguinaudeau/margins.pglm
-# TO DO: Check warnings
-# NOTE: SE/z/p/CIs seems incorrect. Contact author?
-
-summary(margins::margins(model = m1.8a, formula = f1.8a))
-
-## Audience
-m.audience <- margins::margins(model = m1.8a,
-                               at = list("valence.3.cwc" = c(seq(from = -1.3, to = 0.7, by = 0.1))),
-                               variables = "audience_count.lcwc",
-                               formula = f1.8a)
-
-ggplot(aes(x = valence.3.cwc,
-           y = AME,
-           ymin = lower,
-           ymax = upper),
-       data = summary(m.audience)) +
-  geom_point() +
-  geom_linerange() +
-  labs(y = "Average Marginal Effect of \n audience_count (log)",
-       title = "Information") +
-  theme_bw()
+modelsummary(models,
+             estimate = "{estimate} ({std.error})",
+             statistic = "p = {p.value}") # https://vincentarelbundock.github.io/modelsummary/articles/modelsummary.html
 
 
-##  Media
-m.media <- margins::margins(model = m1.8a,
-                            at = list("valence.3.cwc" = c(seq(from = -1.3, to = 0.7, by = 0.1))),
-                            variables = "media_count.lcwc",
-                            formula = f1.8a)
-ggplot(aes(x = valence.3.cwc,
-           y = AME,
-           ymin = lower,
-           ymax = upper),
-       data = summary(m.media)) +
-  geom_point() +
-  geom_linerange() +
-  labs(y = "Average Marginal Effect of \n media_count",
-       title = "Information") +
-  theme_bw()
+# Rerun with random GLMMadaptive
 
-# Alternative: panelr
-
-rdata <- tdata %>%
-  mutate(agencyname = as.ordered(as.factor(agencyname)),
-         month = as.ordered(as.factor(month)))
-
-rdata <- panel_data(rdata, id = agencyname, wave = month)
-
-pdim(rdata)
-
-m1.8b <- wbm(information ~
-               lag(information.cgm) +
-               lag(information.cgm, 12) + 
-               valence.3.cgm +
-               media_count.lcgm +
-               lag(audience_count.lcgm) +
-               valence.3.cgm:media_count.lcgm +
-               lag(audience_count.lcgm):valence.3.cgm +
-               lag(audience_threat.cgm),
-             data = rdata,
-             interaction.style = "double-demean",
-             model = "within",
-             family = "gaussian")
-
-summary(m1.8b)
-
-# Note: 'raw' & 'double-demean' produce nearly identical results -> both interactions are n.s.
-# Only 'demean' produces (highly) significant results.
-# Setting interaction.style to 'demean' produces results very close to those from pglm
-
-m1.8c <- wbm(information.log ~
-               lag(information.log) +
-               lag(information.log, 12) + 
-               valence.3 +
-               media_count +
-               lag(audience_count.log) +
-               valence.3:media_count +
-               lag(audience_count.log):valence.3 +
-               lag(audience_threat),
-             data = rdata,
-             interaction.style = "double-demean",
-             model = "within",
-             family = "gaussian")
-
-summary(m1.8c)
-
-probe_interaction() #  https://rdrr.io/cran/interactions/man/probe_interaction.html
-
-# GLMMTMB
-m1.8d <- glmmTMB(information ~
-                   valence.3.cwc*media_count.lcwc +
-                   audience_count.lcwc*valence.3.cwc +
-                   (1 | agencyname) +
-                   ar1(month + 0 | agencyname),
-                 data = tdata,
-                 family = nbinom2)
-help("convergence")
-summary(m1.8d)
-
-# Alternative: GLMMadaptive
-m1.8e <- mixed_model(fixed = information ~
-                       valence.3.cwc*media_count.lcwc +
-                       audience_count.lcwc*valence.3.cwc,
-                     random = ~ random.num | agencyname,
-                     data = tdata,
-                     family = negative.binomial())
-
-summary(m1.8e)
-m1.8f <- update(m1.8e, nAGQ = 21)
-
-fixef(m1.8f)
-ranef(m1.8f)
-
-# ======================================================
-#           Responsiveness
-# ======================================================
-
-# Distribution
-ggplot(data, aes(x = response)) +
-  geom_histogram(aes(y = ..density..), # the histogram will display "density" on its y-axis
-                 binwidth = 1,
-                 colour = "black",
-                 fill = "white") +
-  theme_clean() + 
-  geom_density(alpha = .2, fill="#FF6655")
-
-# Offset does not work in pglm
-# See: https://stackoverflow.com/questions/55966561/pglm-fixed-effect-poisson-model-with-offset
-
-# Solution: different data format:
-# 1) Tweet - agency, with dummy DV varying between 'response' and 'no response'
-# 2) Panelr can be used to specify offset

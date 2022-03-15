@@ -1,3 +1,16 @@
+# Library
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
+library(sjmisc)
+library(kableExtra)
+library(sjPlot)
+library(fixest)
+library(modelsummary)
+library(GLMMadaptive)
+
+load("./data/response_panel.Rda")
 
 # ======================================================
 #           Panel agency-by-week

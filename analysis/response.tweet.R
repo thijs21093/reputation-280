@@ -23,9 +23,11 @@ Sys.setenv(TZ = 'GMT')
 # Transformation
 # ======================================================
 response.data <- response.tweet %>%
-  filter(same.message == 0 &
-         time.on.Twitter >= 0) %>%
+  filter(same.message == 0 & # Difficult to model, so better to remove altogether
+         time.on.Twitter >= 0,
+         agencyname != "EIOPA") %>% # Only zeros
   dplyr::mutate(conversations.log = log(conversations),
+         sentiment.factor = as.factor(sentiment),
          media.count.30d.log = log(media.count.30d + 1),
          media.count.90d.log = log(media.count.90d + 1),
          media.count.365d.log = log(media.count.365d + 1),
@@ -82,9 +84,7 @@ response.data %>%
 #           Cross-sectional fixed effect
 # ======================================================
 
-# Model 1.0: Main IVs
-
-# 90 days
+# Start with 90 days
 f1.0 <- feglm(response ~ 
                 twitter.valence.90d + 
                 media.valence.90d +
@@ -278,17 +278,6 @@ etable(f1.8, f1.8.conversation, f1.8.agencyyear, fitstat = ~ . + ll + aic)
 f1.8.plot <- fixef(f1.8)
 plot(f1.8.plot)
 
-# Heterogeneity
-obs.removed3 <- f1.8$obs_selection$obsRemoved
-data.removed3 <- response.data[(obs.removed3),]
-
-data.demean <- cbind(
-  data.removed3,
-  datawizard::demean(data.removed3,
-                     select = c("twitter.valence.365d", "media.valence.365d", "media.count.365d.log",
-                    "short", "qm.comment", "attachment", "conversations.log", "sentiment", "information.90d", "weekend", "mention", "qm.agency"), group = "agencyname"))
-# https://easystats.github.io/datawizard/reference/demean.html
-
 # Quick export
 # Add info on varying slope
 
@@ -320,6 +309,28 @@ modelsummary(models,
              estimate = "{estimate} ({std.error})",
              statistic = "p = {p.value}") # https://vincentarelbundock.github.io/modelsummary/articles/modelsummary.html
 
+# ======================================================
+#           # Robustness check: GLMMadaptive
+# ======================================================
 
-# Rerun with random GLMMadaptive
+# Construct dataset with same observation
+obs.removed3 <- f1.8$obs_selection$obsRemoved
+data.removed3 <- response.data[(obs.removed3),]
 
+data.demean <- cbind(
+  data.removed3,
+  datawizard::demean(data.removed3,
+                     select = c("twitter.valence.365d", "media.valence.365d", "media.count.365d.log",
+                                "short", "time.on.Twitter.s", "qm.comment", "attachment", "conversations.log", "sentiment.factor", "information.90d", "weekend", "mention", "qm.agency"), group = "agencyname"))
+
+# ======================================================
+#           # Random effects: GLMMadaptive
+# ======================================================
+
+r1.8.year <- mixed_model(fixed = response ~ twitter.valence.365d_within + media.valence.365d_within + media.count.365d.log_within + 
+                           short_within + qm.comment_within + attachment_within + conversations.log_within + information.90d_within + sentiment.factor_twitter.criticism_within + sentiment.factor_twitter.praise_within + weekend_within + mention_within  + qm.agency_within + time.on.Twitter.s_within,
+                    random = ~ time.on.Twitter.s_within | agencyname, 
+                    data = data.demean,
+                    family = binomial())
+
+summary(g1.8.year)

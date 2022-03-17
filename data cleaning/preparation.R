@@ -516,25 +516,34 @@ twitter.day.lag <- twitter.day %>%
     # Twitter
     
     # Number of responses in past week/month/quarter/year
-    responses.7d = rollapplyr(responses.count, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    responses.1w = rollapplyr(responses.count, list(seq(-7, -1)), sum, fill = NA, align = "right"),
     responses.30d = rollapplyr(responses.count, list(seq(-30, -1)), sum, fill = NA, align = "right"),
     responses.90d = rollapplyr(responses.count, list(seq(-90, -1)), sum, fill = NA, align = "right"),
     responses.365d = rollapplyr(responses.count, list(seq(-365, -1)), sum, fill = NA, align = "right"),
     
     # Number of comments in past week/month/quarter/year
-    comments.7d = rollapplyr(comments.count, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    comments.1w = rollapplyr(comments.count, list(seq(-7, -1)), sum, fill = NA, align = "right"),
     comments.30d = rollapplyr(comments.count, list(seq(-30, -1)), sum, fill = NA, align = "right"),
     comments.90d = rollapplyr(comments.count, list(seq(-90, -1)), sum, fill = NA, align = "right"),
     comments.365d = rollapplyr(comments.count, list(seq(-365, -1)), sum, fill = NA, align = "right"),
     
     # ratio between responses and comments in past week/month/quarter/year
-    responses.ratio.7d = ifelse(!comments.7d, 0, (responses.7d / comments.7d)),
+    responses.ratio.1w = ifelse(!comments.1w, 0, (responses.1w / comments.1w)),
     responses.ratio.30d = ifelse(!comments.30d, 0, (responses.30d / comments.30d)),
     responses.ratio.90d = ifelse(!comments.90d, 0, (responses.90d / comments.90d)),
     responses.ratio.365d = ifelse(!comments.365d, 0, (responses.365d / comments.365d)),
     
     # Valence on Twitter
-    # Valence on Twitter in past 30 days
+    # Valence on Twitter in past week
+    twitter.criticism.1w = rollapplyr(twitter.criticism, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    twitter.praise.1w = rollapplyr(twitter.praise, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    twitter.neutral.1w = rollapplyr(twitter.neutral, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    twitter.valence.1w = ifelse(!(twitter.praise.1w + twitter.neutral.1w + twitter.criticism.1w), 0, (twitter.praise.1w - twitter.criticism.1w) / (twitter.praise.1w + twitter.neutral.1w + twitter.criticism.1w)),
+    
+    # Meijer and Kleinnijenhuis index (1 week): pos - neg
+    twitter.index.1w = twitter.praise.1w - twitter.criticism.1w,
+    
+        # Valence on Twitter in past 30 days
     twitter.criticism.30d = rollapplyr(twitter.criticism, list(seq(-30, -1)), sum, fill = NA, align = "right"),
     twitter.praise.30d = rollapplyr(twitter.praise, list(seq(-30, -1)), sum, fill = NA, align = "right"),
     twitter.neutral.30d = rollapplyr(twitter.neutral, list(seq(-30, -1)), sum, fill = NA, align = "right"),

@@ -6,113 +6,163 @@ library(ggthemes)
 library(sjmisc)
 library(kableExtra)
 library(sjPlot)
-library(fixest)
+library(panelr)
 library(modelsummary)
-library(GLMMadaptive)
+library(plm)
 
 load("./data/response_panel.Rda")
+
+# To do: remove same week in data cleaning script
+# Check NAs in media.source and no.of.sources
+ ## EMCDDA and EUROFOUND
+# Fix lag
 
 # ======================================================
 #           Panel agency-by-week
 # ======================================================
+panel.new <- response.panel %>%
+  drop_na() %>% 
+  ungroup() %>%
+  filter(agencyname != "EIOPA") %>% # Only zeros
+  dplyr::mutate(
+        # Scale information
+    information.s = information/100,
 
-m1.0 <- pglm(information ~ 
-               lag(information.cgm) +
-               lag(information.cgm,  12),
-             data = pdata,
-             model = "within",
-             family = "negbin")
+    # Scale Twitter index
+    twitter.index.s = twitter.index/100,
+    
+    # Media valence
+    media.valence = ifelse(!(positive + neutral + negative), 0, (positive - negative) / (positive + neutral + negative))) # Move to other script
+    
+# Descriptives
+# ======================================================
+var.table.t <- panel.new %>% 
+  dplyr::select(
+    response.week, twitter.index.s, media.source, media.valence, 
+      short.ratio,
+      qm.comment.ratio,
+      attachment.ratio,
+      information.s,
+      weekend.ratio,
+      mention.ratio,
+      qm.agency.ratio,
+    offset.week) %>%
+  descr() %>% 
+  data.frame() %>% 
+  dplyr::select(-type,
+                -var,
+                -NA.prc,
+                -se,
+                -trimmed,
+                -iqr) %>%
+  mutate_at(vars(c("mean","sd","md")),funs(round(.,3)))
 
-summary(m1.0)
+var.table.t %>%
+  kable(col.names = c("Var",
+                      "n",
+                      "Mean",
+                      "SD",
+                      "Median",
+                      "Range",
+                      "Skew")) %>% 
+  kable_styling(bootstrap_options = c("condensed"),
+                full_width = F,
+                position = "left")
 
-m1.1 <- update(m1.0, . ~ . +
-                 audience_count.lcgm +
-                 audience_threat.cgm +
-                 lag(audience_count.lcgm) +
-                 lag(audience_threat.cgm))
+# Creating a panel dataset
+panel <- panel_data(panel.new, id = agencyname, wave = week) %>%
+  mutate(media.source.lag	= media.source)
 
-summary(m1.1)
+pdim(panel)
 
-m1.2 <- update(m1.0, . ~ . +
-                 media_count.lcgm +
-                 lag(media_count.lcgm) +
-                 media_count.cgm +
-                 lag(media_count.cgm) +
-                 media_count.3.cgm +
-                 media_count.12.cgm +
-                 media_threat.cgm +
-                 lag(media_threat.cgm))
-summary(m1.2)
+# ======================================================
+#           Panel
+# ======================================================
 
-m1.3 <- update(m1.0, . ~ . +
-                 valence.3 + 
-                 valence.12) # No effect...
+# Null model
+p0 <- wbm(response.week ~ 1,
+          offset = log(offset.week + 1),
+          data = panel,
+          model = "within",
+          family = "poisson")
 
-summary(m1.3)
+summary(p0)
 
-# m1.4 <- update(m1.0, . ~ . +
-#                 hearing +
-#                 lag(hearing)) # Needs fixing, see above
+# Add vars of interest
+p1 <-  wbm(response.week ~
+             plm::lag(twitter.index.s, 12) + 
+             plm::lag(media.source, 12) +
+             plm::lag(media.valence, 12),
+           offset = log(offset.week + 1),
+           data = panel,
+           model = "within",
+           family = "poisson")
+  
+summary(p1)
 
-# summary(m1.4)
+anova(p0, p1)
 
-m1.5 <- update(m1.0, . ~ . +
-                 lag(audience_count.lcgm) +
-                 lag(audience_threat.cgm) +
-                 valence.3.cgm +
-                 valence.3.cgm:lag(audience_count.lcgm),
-               valence.3.cgm:lag(audience_threat.cgm))
+# Add interaction
+p2 <- wbm(response.week ~
+          plm::lag(twitter.index.s, 12) * plm::lag(media.source, 12) * plm::lag(media.valence, 12),
+          offset = log(offset.week + 1),
+          data = panel,
+          model = "within",
+          family = "poisson",
+          interaction.style = "double-demean")
 
-summary(m1.5)
+summary(p2)
+anova(p1, p2)
 
-m1.6 <- update(m1.0, . ~ . +
-                 media_count.lcgm +
-                 valence.3.cgm +
-                 valence.3.cgm:media_count.lcgm)
-summary(m1.6)
+# probe_interaction(p2)
+#  https://rdrr.io/cran/interactions/man/probe_interaction.html
 
-m1.7 <- update(m1.0, . ~ . +
-                 media_count.lcgm +
-                 valence.3.cgm +
-                 lag(audience_count.lcgm) +
-                 valence.3.cgm:media_count.lcgm +
-                 valence.3.cgm:lag(audience_count.lcgm))
-summary(m1.7)
 
-m1.8 <- update(m1.7, . ~ . +
-                 lag(audience_threat.cgm))
+# Add controls
+p3 <- wbm(response.week ~
+          plm::lag(twitter.index.s, 12) * plm::lag(media.source, 12) * plm::lag(media.valence, 12) +
+          short.ratio +
+          qm.comment.ratio +
+          attachment.ratio +
+          information.s +
+          weekend.ratio	+
+          mention.ratio	+
+          qm.agency.ratio,
+          offset = log(offset.week + 1),
+          data = panel,
+          model = "within",
+          family = "poisson",
+          interaction.style = "double-demean")
 
-summary(m1.8)
+summary(p3)
+anova(p2, p3)
 
-f1.8a <- information ~
-  lag(information) +
-  lag(information, 12) + 
-  valence.3 +
-  media_count.l +
-  lag(audience_count.l) +
-  valence.3.cwc:media_count.lcwc +
-  lag(audience_count.lcwc):valence.3.cwc +
-  lag(audience_threat)
+# Add time
+p4 <- wbm(response.week ~
+            plm::lag(twitter.index.s, 12) * plm::lag(media.source, 12) * plm::lag(media.valence, 12) +
+            short.ratio +
+            qm.comment.ratio +
+            attachment.ratio +
+            information.s,
+          offset = log(offset.week + 1),
+          data = panel,
+          model = "within",
+          family = "poisson",
+          use.wave = TRUE,
+          interaction.style = "double-demean")
 
-# Note:
-## lag of 1: p = 0.075
-## media_count.3: p = 0.13
-## media_count.12: p = 0.022
-# Note: valence.3:lag(audience_threat) = n.s.
+summary(p4)
+anova(p3, p4)
 
-# Getting marginal effects
 
-m1.8a <- pglm(f1.8a,
-              data = pdata,
-              family = 'negbin', 
-              model = "within")
+# Detrend
+# detrend
+# balance.correction	
+# Correct between-subject effects for unbalanced panels following the procedure in Curran and Bauer (2011)? Default is FALSE
+# Negbin?
 
-summary(m1.8a)
 
 # See https://github.com/benjaminguinaudeau/margins.pglm
-# TO DO: Check warnings
-# NOTE: SE/z/p/CIs seems incorrect. Contact author?
-
 summary(margins::margins(model = m1.8a, formula = f1.8a))
 
 ## Audience
@@ -148,96 +198,3 @@ ggplot(aes(x = valence.3.cwc,
   labs(y = "Average Marginal Effect of \n media_count",
        title = "Information") +
   theme_bw()
-
-# Alternative: panelr
-
-rdata <- tdata %>%
-  mutate(agencyname = as.ordered(as.factor(agencyname)),
-         month = as.ordered(as.factor(month)))
-
-rdata <- panel_data(rdata, id = agencyname, wave = month)
-
-pdim(rdata)
-
-m1.8b <- wbm(information ~
-               lag(information.cgm) +
-               lag(information.cgm, 12) + 
-               valence.3.cgm +
-               media_count.lcgm +
-               lag(audience_count.lcgm) +
-               valence.3.cgm:media_count.lcgm +
-               lag(audience_count.lcgm):valence.3.cgm +
-               lag(audience_threat.cgm),
-             data = rdata,
-             interaction.style = "double-demean",
-             model = "within",
-             family = "gaussian")
-
-summary(m1.8b)
-
-# Note: 'raw' & 'double-demean' produce nearly identical results -> both interactions are n.s.
-# Only 'demean' produces (highly) significant results.
-# Setting interaction.style to 'demean' produces results very close to those from pglm
-
-m1.8c <- wbm(information.log ~
-               lag(information.log) +
-               lag(information.log, 12) + 
-               valence.3 +
-               media_count +
-               lag(audience_count.log) +
-               valence.3:media_count +
-               lag(audience_count.log):valence.3 +
-               lag(audience_threat),
-             data = rdata,
-             interaction.style = "double-demean",
-             model = "within",
-             family = "gaussian")
-
-summary(m1.8c)
-
-probe_interaction() #  https://rdrr.io/cran/interactions/man/probe_interaction.html
-
-# GLMMTMB
-m1.8d <- glmmTMB(information ~
-                   valence.3.cwc*media_count.lcwc +
-                   audience_count.lcwc*valence.3.cwc +
-                   (1 | agencyname) +
-                   ar1(month + 0 | agencyname),
-                 data = tdata,
-                 family = nbinom2)
-help("convergence")
-summary(m1.8d)
-
-# Alternative: GLMMadaptive
-m1.8e <- mixed_model(fixed = information ~
-                       valence.3.cwc*media_count.lcwc +
-                       audience_count.lcwc*valence.3.cwc,
-                     random = ~ random.num | agencyname,
-                     data = tdata,
-                     family = negative.binomial())
-
-summary(m1.8e)
-m1.8f <- update(m1.8e, nAGQ = 21)
-
-fixef(m1.8f)
-ranef(m1.8f)
-
-# ======================================================
-#           Responsiveness
-# ======================================================
-
-# Distribution
-ggplot(data, aes(x = response)) +
-  geom_histogram(aes(y = ..density..), # the histogram will display "density" on its y-axis
-                 binwidth = 1,
-                 colour = "black",
-                 fill = "white") +
-  theme_clean() + 
-  geom_density(alpha = .2, fill="#FF6655")
-
-# Offset does not work in pglm
-# See: https://stackoverflow.com/questions/55966561/pglm-fixed-effect-poisson-model-with-offset
-
-# Solution: different data format:
-# 1) Tweet - agency, with dummy DV varying between 'response' and 'no response'
-# 2) Panelr can be used to specify offset

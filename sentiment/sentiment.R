@@ -14,7 +14,7 @@ library(tm)
 
 
 #load documents
-load("media/media.Rdata")
+load("media/media_articles.Rdata")
 load("from_tweets_2")
 load("to_tweets_2")
 
@@ -26,31 +26,33 @@ tibble.to <- tibble.to[tibble.to$lang=="en",]
 media$complete_text <- paste(paste0(media$heading, "."), media$text)
 media$complete_text <- gsub("\r?\n|\r", " ", media$complete_text)
 
-media$complete_text[1]
+media$complete_text[2]
+write.csv(media$complete_text[c(1:10)], file="test.txt") # check how R and excel handle the escape character \ - turns out, if put in a .txt file, it turns it into two "" each time
 ### TRIAL for media articles ###
 
 #take first 100 media articles
-media_trial <- media[media$id=="frontex",][1:100,]
+set.seed(1993)
+media_trial <- sample_n(media[media$id=="ecdc",], 100)
 media_trial$id <- as.character(c(1:100))
 
 #pass to gcs
-trial_results <- gl_nlp(
+trial_results_ecdc <- gl_nlp(
   media_trial$complete_text,
   nlp_type = "analyzeEntitySentiment",
   type = c("PLAIN_TEXT"),
   language = c("en")
 )
 
-#save(trial_results, file="sentiment/mediasentiment_output.RData")
+#save(trial_results_ecdc, file="sentiment/mediasentimentecdc_output.RData")
 
 #extract results to a usable format
-testlist <- trial_results
-for (i in 1:length(trial_results$entities)){
+testlist <- trial_results_ecdc
+for (i in 1:length(testlist$entities)){
   print(i)
-  trial_results$entities[[i]]$id = paste0(i)
+  testlist$entities[[i]]$id = paste0(i)
 }
 
-trial_dataframe <-bind_rows(trial_results$entities)
+trial_dataframe <-bind_rows(testlist$entities)
 trial_dataframe$name <- tolower(trial_dataframe$name)
 trial_dataframe <- trial_dataframe %>%
   drop_na(score)
@@ -61,7 +63,7 @@ names <- trial_dataframe %>%
   arrange(desc(n))
 
 agency.names <- names %>% filter(str_detect(name, "agency") == TRUE |
-                                   str_detect(name, "frontex") == TRUE)
+                                   str_detect(name, "ecdc") == TRUE)
 print(agency.names$name)
 
 # only keep matches with the agency
@@ -84,17 +86,20 @@ agency_descriptives <- c("frontex",
                          "european agency for the management of operational cooperation",
                          "frontier agency")
 
-trial_dataframe2 <- trial_dataframe[trial_dataframe$name %in% agency_descriptives,]
+agency_descriptives_ecdc <- c("ecdc", "european center for disease prevention and control","european centre for disease prevention and control"
+,"disease control agency")
+
+trial_dataframe2 <- trial_dataframe[trial_dataframe$name %in% agency_descriptives,] #frontex
+trial_dataframe3 <- trial_dataframe[trial_dataframe$name %in% agency_descriptives_ecdc,] #ecdc
 
 # introduce combined measure of magnitude and score to avoid misclassifications
-trial_dataframe$com_score <- trial_dataframe$magnitude*trial_dataframe$score
+trial_dataframe3$com_score <- trial_dataframe3$magnitude*trial_dataframe3$score
 
-ggplot(trial_dataframe, aes(x = com_score)) +  
+ggplot(trial_dataframe3, aes(x = com_score)) +  
   geom_histogram(colour = "black", fill = "white")
 
-# best approach seems to be to measure positivity and negativity separately
-# Let's take the mention with the lowest score to see differences.
-trial_dataframe <- trial_dataframe %>% 
+#calculate more metrics
+trial_dataframe3 <- trial_dataframe3 %>% 
   group_by(id) %>% 
   summarise(com_score_mean = mean(com_score),
             com_score_median = median(com_score),
@@ -106,14 +111,14 @@ trial_dataframe <- trial_dataframe %>%
             score_max = max(score),
             hits = n())
 
-ggplot(trial_dataframe, aes(x = com_score_mean)) +  
+ggplot(trial_dataframe3, aes(x = com_score_mean)) +  
   geom_histogram(colour = "black", fill = "white")
 
 # join text and score dataset
 media_sentiment <- left_join(media_trial, trial_dataframe, by="id")
 
 # save file
-save(media_sentiment, file="sentiment/media_sentiment.RData")
+save(media_sentiment, file="sentiment/media_sentiment_ecdc.RData")
 
 ### TRIAL for tweets ###
 # Take first 10 tweets

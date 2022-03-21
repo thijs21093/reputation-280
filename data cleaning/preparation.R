@@ -481,11 +481,6 @@ consequences.week <- sentiment.data %>%
   mutate(week = as.POSIXct(week),
          twitter.index = twitter.praise - twitter.criticism)
 
-information.day$day
-consequences.day$day
-media.day$day
-media.sentiment.day$day
-
 # ======================================================
 #           Joining dataframes: tweet-level
 # ======================================================
@@ -614,7 +609,7 @@ response.tweet <- sentiment.data %>%
 
 # Join dataframes with weekly data
 twitter.week <- information.week %>%
-  full_join(consequences.week,  by = c("agencyname", "week")) %>%
+  full_join(consequences.week, by = c("agencyname", "week")) %>%
   full_join(media.week, by = c("agencyname", "week")) %>%
   full_join(media.sentiment.week,  by = c("agencyname", "week")) %>%
   full_join(joining.date, by = "agencyname")
@@ -656,7 +651,8 @@ response.panel <- sentiment.data %>%
   left_join(agency.week, by = c("agencyname", 'week')) %>% 
   mutate(time.on.Twitter = difftime(strptime(week, format = "%Y-%m-%d"),
                              strptime(join.day, format = "%Y-%m-%d"), units = c("weeks")) %>% as.numeric(),
-         twitter.valence = twitter.praise - twitter.criticism) %>%
+         twitter.valence = twitter.praise - twitter.criticism,
+         media.valence = ifelse(!(positive + neutral + negative), 0, (positive - negative) / (positive + neutral + negative))) %>%
   filter(time.on.Twitter >= 0)
 
 #           A look at the distribution

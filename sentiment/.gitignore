@@ -2,3 +2,6 @@ media_sentiment.RData
 mediasentiment_output.RData
 tweets_sentiment.RData
 tweetssentiment_output.RData
+sentiment (conflicted copy 2022-03-16 131445).R
+mediasentimentecdc_output.RData
+media_sentiment_ecdc.RData

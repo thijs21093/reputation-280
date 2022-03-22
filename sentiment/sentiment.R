@@ -12,6 +12,8 @@ library(tidyr)
 library(stringr)
 library(tm)
 
+# Set time zone
+Sys.setenv(TZ = 'GMT')
 
 #load documents
 load("media/media_articles.Rdata")
@@ -52,7 +54,7 @@ for (i in 1:length(testlist$entities)){
   testlist$entities[[i]]$id = paste0(i)
 }
 
-trial_dataframe <-bind_rows(testlist$entities)
+trial_dataframe <- bind_rows(testlist$entities)
 trial_dataframe$name <- tolower(trial_dataframe$name)
 trial_dataframe <- trial_dataframe %>%
   drop_na(score)
@@ -63,7 +65,9 @@ names <- trial_dataframe %>%
   arrange(desc(n))
 
 agency.names <- names %>% filter(str_detect(name, "agency") == TRUE |
-                                   str_detect(name, "ecdc") == TRUE)
+                                   str_detect(name, "ecdc") == TRUE |
+                                   str_detect(name, "centre") == TRUE |
+                                   str_detect(name, "center") == TRUE)
 print(agency.names$name)
 
 # only keep matches with the agency
@@ -86,8 +90,13 @@ agency_descriptives <- c("frontex",
                          "european agency for the management of operational cooperation",
                          "frontier agency")
 
-agency_descriptives_ecdc <- c("ecdc", "european center for disease prevention and control","european centre for disease prevention and control"
-,"disease control agency")
+agency_descriptives_ecdc <- c("ecdc",
+                              "european center for disease prevention and control",
+                              "european centre for disease prevention and control",
+                              "disease control agency",
+                              "european centre for disease control",
+                              "theeuropean center for disease prevention and control",
+                              "agency")
 
 trial_dataframe2 <- trial_dataframe[trial_dataframe$name %in% agency_descriptives,] #frontex
 trial_dataframe3 <- trial_dataframe[trial_dataframe$name %in% agency_descriptives_ecdc,] #ecdc

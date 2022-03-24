@@ -12,6 +12,9 @@ library(stringr)
 library(lubridate)
 library(sjmisc)
 library(textutils)
+library(stringi)
+library(tm)
+library(qdapRegex)
 
 # Set time zone
 Sys.setenv(TZ = 'GMT')
@@ -45,6 +48,7 @@ media.sentiment.week <- media.sentiment.week %>%
 # ======================================================
 #           Information
 # ======================================================
+
 from.agency <- tibble.from %>%
  filter(agencyname != "FRA") %>% # To do: add FRA
  arrange(referenced_type != 'replied_to') %>% # Remove 'quoted' if 'replied to' is present for same tweet id
@@ -204,7 +208,9 @@ conversation <- to.agency2 %>% group_by(conversation_id) %>%
 
 # Add length of conversations
 to.agency3 <- to.agency2 %>%
-  full_join(conversation, by = "conversation_id")
+  full_join(conversation, by = "conversation_id") %>% 
+  mutate(doc_id = row_number()) %>% # Add doc id for later
+  relocate(doc_id, text) 
 
 # Same message from same author
 same.message <- to.agency3 %>%
@@ -212,6 +218,52 @@ same.message <- to.agency3 %>%
   filter(n() > 1) %>% 
   ungroup() %>%
 dplyr::select(tweet_id) %>% 
+  as.list()
+
+# Uncivil
+removeURL <- content_transformer(function(x) gsub("(f|ht)tp(s?)://\\S+", " ", x, perl = T))
+removeemojis <- content_transformer(function(x) gsub("[^\x01-\x7F]", " ", x, perl = T))
+
+uncivil.data <- to.agency3 %>% select(doc_id, text) 
+corpus.uncivil <- Corpus(DataframeSource(uncivil.data)) 
+
+corpus.tmp <- tm_map(corpus.uncivil, removeURL)
+corpus.tmp <- tm_map(corpus.tmp, removeemojis)
+corpus.tmp <- tm_map(corpus.tmp, removePunctuation)
+corpus.tmp <- tm_map(corpus.tmp, removeNumbers)
+corpus.tmp <- tm_map(corpus.tmp, content_transformer(tolower))
+corpus.tmp <- tm_map(corpus.tmp, stemDocument)
+corpus.tmp <- tm_map(corpus.tmp, stripWhitespace)
+
+corpus.dtm <- DocumentTermMatrix(corpus.tmp,
+                                 list(dictionary = c("cunt",
+                                                     "fuck",
+                                                     "twat",
+                                                     "stupid",
+                                                     "shit",
+                                                     "dick",
+                                                     "tit",
+                                                     "wanker",
+                                                     "scumbag",
+                                                     "moron",
+                                                     "cock",
+                                                     "foot",
+                                                     "racist",
+                                                     "fascist",
+                                                     "sicken",
+                                                     "fart",
+                                                     "fuck",
+                                                     "ars",
+                                                     "suck",
+                                                     "nigga",
+                                                     "smug",
+                                                     "fck", # Added
+                                                     "fcking", # Added
+                                                     "idiot",
+                                                     "arsehol")))
+
+uncivil.list <- corpus.dtm$i %>% as_tibble() %>%
+  rename(doc_id = value) %>%
   as.list()
 
 #           Adding other variables
@@ -227,6 +279,12 @@ response <- to.agency3 %>%
   response = case_when(
     tweet_id2 %in% response.filter[["referenced_id2"]] ~ 1, # Code as 1 when tweet is AT LEAST ONCE responded to
     !tweet_id2 %in% response.filter[["referenced_id2"]] ~ 0), # Code as 0 if not
+  
+  # Uncivil tweets
+    uncivil.tweet = case_when(
+      doc_id %in% uncivil.list[["doc_id"]] ~ 1, # Code as 1 if uncivil
+      !doc_id %in% uncivil.list[["doc_id"]] ~ 0), # Code 0 if not
+  
   
   # Did the agency respond with a comment?
   response.comment = case_when(
@@ -261,6 +319,13 @@ response <- to.agency3 %>%
                        units = c("days")) %>% # Number of days passed since start
     round(0) %>% # Ignore differences because of summer/winter time
     as.numeric(), # Numeric
+  
+  # ALL CAPS
+  cap = stringi::stri_count_regex(text.url, grab("@rm_caps")),
+  cap.perc = cap/ngrams,
+  cap.dummy = case_when(
+           cap.perc >= 0.5 ~ 1,
+           cap.perc < 0.5 ~ 0),
   
   # Year and month
   year =  format(as.POSIXct(created_at), format= "%Y"), 
@@ -453,7 +518,7 @@ sentiment.data <- merge(sentiment,
   mutate(sentiment = case_when(
     compound <= -0.05 ~ "twitter.criticism",
     compound > -0.05 & compound < 0.05 ~ "twitter.neutral",
-    compound >= 0.05 ~ "twitter.praise"))
+    compound >= 0.05 ~ "twitter.praise")) 
 
 # Distribution
 sentiment.data %>%
@@ -631,6 +696,7 @@ agency.week <- engaging %>%
 #           Putting it all together
 # ======================================================
 response.panel <- sentiment.data %>%
+  filter(same.message == 0) %>% # Remove 'same message' tweets
   group_by(agencyname,
            week = cut(day, "week"),
            .drop = FALSE) %>%
@@ -651,7 +717,10 @@ response.panel <- sentiment.data %>%
   left_join(agency.week, by = c("agencyname", 'week')) %>% 
   mutate(time.on.Twitter = difftime(strptime(week, format = "%Y-%m-%d"),
                              strptime(join.day, format = "%Y-%m-%d"), units = c("weeks")) %>% as.numeric(),
-         twitter.valence = twitter.praise - twitter.criticism,
+         real.time = difftime(strptime(created_at, format = "%Y-%m-%d"),
+                              strptime(start, format = "%Y-%m-%d"), # See above
+                              units = c("days")),
+         twitter.index = twitter.praise - twitter.criticism,
          media.valence = ifelse(!(positive + neutral + negative), 0, (positive - negative) / (positive + neutral + negative))) %>%
   filter(time.on.Twitter >= 0)
 

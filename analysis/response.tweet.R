@@ -56,7 +56,7 @@ response.data <- response.tweet %>%
          time.on.Twitter.s = time.on.Twitter/365,
          time.on.Twitter.s2 = time.on.Twitter.s^2)
   
-# Centering & transformation: cross-sectional
+# Descriptives
 # ======================================================
 var.table.t <- response.data %>% 
   dplyr::select(where(is.numeric)) %>%
@@ -213,6 +213,7 @@ f1.5alt <- update(f1.2m,  . ~ . + time.on.Twitter.s + time.on.Twitter.s2)
 etable(f1.5, f1.5.rawpoly, f1.5.orgpoly, fitstat = ~ . + ll + aic) # Second order polynomials are n.s
 
 # Model 1.7: Time on Twitter as random slope
+# Assumes linear relationshio -> see https://stats.stackexchange.com/questions/548268/can-i-include-time-as-an-independent-variable-in-a-panel-data-model
 f1.7 <- feglm(response ~ 
                 twitter.index.90d.s + 
                 media.valence.90d +

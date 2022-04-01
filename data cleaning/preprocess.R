@@ -14,7 +14,7 @@ Sys.setenv(TZ = 'GMT')
 rm(list = ls())
 
 # Data
-load(file="./Data/alltweets3") # Data
+load(file="./Data/data_tweets_4/alltweets4") # Data
 
 # Create dataframe
 for (i in seq(alltweets)){
@@ -40,7 +40,7 @@ tibble.from %>%
   group_by(referenced_type) %>%
   dplyr::summarise(count = n()) # Count
 
-save(tibble.from, file = "from_tweets_2")
+save(tibble.from, file = "from_tweets_3")
 
 # ======================================================
 #           Replies to agencies
@@ -50,7 +50,7 @@ save(tibble.from, file = "from_tweets_2")
 rm(list = ls())
 
 # Data
-load(file = "./Data/all_replies_3") # Data, set path
+load(file = "./Data/data_replies_5/allreplies_5") # Data, set path
 
 # Create dataframe
 for (i in seq(allreplies)){
@@ -70,4 +70,5 @@ tibble.to <-  df.to %>%
   mutate(referenced_type = tidyr::replace_na(referenced_type, "no reference"),
          created_at = with_tz(created_at, "GMT"))
 
-save(tibble.to, file = "to_tweets_2")
+save(tibble.to, file = "to_tweets_3")
+

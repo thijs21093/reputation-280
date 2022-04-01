@@ -89,14 +89,14 @@ EFSA_tweetcounts$end = as.POSIXct(EFSA_tweetcounts$end,
 allreplies = list()
 
 # cycle through handles and save tweets to allreplies
-for (i in 24:nrow(handles)) {
+for (i in 1:nrow(handles)) {
   print(handles$twitter_handle[i])
   repliestweets = get_all_tweets(
     reply_to = substring(handles$twitter_handle[i], 2),
     start_tweets = "2007-01-01T00:00:00Z",
     end_tweets = "2021-12-31T00:00:00Z",
     bearer_token = get_bearer(),
-    data_path = "data_replies_3",
+    data_path = "data_replies_4",
     bind_tweets = T,
     n = 1000000
   )
@@ -106,7 +106,7 @@ for (i in 24:nrow(handles)) {
 }
 
 # EURightsAgency does not work for some reason (no 23) skipped it for now
-save(allreplies, file = "all_replies_3")
+save(allreplies, file = "all_replies_4")
 
 
 

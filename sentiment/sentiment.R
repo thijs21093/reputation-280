@@ -19,6 +19,10 @@ Sys.setenv(TZ = 'GMT')
 load("media/media_articles.Rdata")
 load("from_tweets_2")
 load("to_tweets_2")
+to_tweets_old <- tibble.to
+load("to_tweets_3")
+
+test <- anti_join(tibble.to, to_tweets_old, by="tweet_id")
 
 #only keep english tweets
 tibble.from <- tibble.from[tibble.from$lang=="en",]

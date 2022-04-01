@@ -41,7 +41,6 @@ media.week <- media.week %>%
 # ======================================================
 
 from.agency <- tibble.from %>%
- filter(agencyname != "FRA") %>% # To do: add FRA
  arrange(referenced_type != 'replied_to') %>% # Remove 'quoted' if 'replied to' is present for same tweet id
   distinct(tweet_id, .keep_all = TRUE) %>%
   mutate(text = textutils::HTMLdecode(text),
@@ -158,7 +157,6 @@ start <- joining.date %>%
 #           Preparing dataframe
 # ======================================================
 to.agency <- tibble.to %>%
-           filter(agencyname != "FRA") %>% # To do: add FRA
            unnest(cols = attachments, # Unnest attachment
                   keep_empty = TRUE) %>%
            filter(referenced_type == "replied_to" & # Remove quoted tweets/retweets
@@ -683,7 +681,8 @@ response.tweet <- sentiment.data %>%
          qm.comment, attachment, real.time, year, sentiment, referenced_id,
          time.on.Twitter, mention, qm.agency, conversations, url, same.message, uncivil.tweet, office.hours) %>%
   left_join(twitter.day.lag, by = c("agencyname", 'day')) %>%
-  filter(time.on.Twitter >= 0)
+  filter(time.on.Twitter >= 0) %>%
+  ungroup()
 
 # ======================================================
 #           Joining dataframes: agency-week panel
@@ -738,7 +737,17 @@ response.panel <- sentiment.data %>%
                               strptime(start, format = "%Y-%m-%d"), # See above
                               units = c("days")),
          twitter.index = twitter.praise - twitter.criticism) %>%
-  filter(time.on.Twitter >= 0)
+  arrange(week) %>%
+  group_by(agencyname) %>% # Lag by one week
+  mutate(twitter.criticism.1w = rollapplyr(twitter.criticism, list(seq(-1, -1)), sum, fill = NA, align = "right"),
+       twitter.praise.1w = rollapplyr(twitter.praise, list(seq(-1, -1)), sum, fill = NA, align = "right"),
+       twitter.neutral.1w = rollapplyr(twitter.neutral, list(seq(-1, -1)), sum, fill = NA, align = "right"),
+       twitter.valence1 = ifelse(!(twitter.praise.1w + twitter.neutral.1w + twitter.criticism.1w), 0, (twitter.praise.1w - twitter.criticism.1w) / (twitter.praise.1w + twitter.neutral.1w + twitter.criticism.1w)),
+
+       twitter.index1 = rollapplyr(twitter.index, list(seq(-1, -1)), sum, fill = NA, align = "right"),
+       media.source1 = rollapplyr(media.source, list(seq(-1, -1)), sum, fill = NA, align = "right"),
+       media.begin1 = rollapplyr(media.begin, list(seq(-1, -1)), sum, fill = NA, align = "right")) %>%
+        filter(time.on.Twitter >= 0)
 
 #           A look at the distribution
 # ======================================================

@@ -3,8 +3,6 @@ library(dplyr)
 library(tidyr)
 library(lubridate)
 
-# Set time zone
-Sys.setenv(TZ = 'GMT')
 
 # ======================================================
 #           From agencies
@@ -30,11 +28,9 @@ tibble.from <-  df %>%
   rename(tweet_id = id) %>% # rename to avoid conflicting names
   unnest(cols = referenced_tweets, # Note: Some tweets are both quotes and replies to statuses.
          keep_empty = TRUE) %>%    # For these tweets, a second row is created when unnesting referenced_tweets.
-  distinct(tweet_id, .keep_all = TRUE) %>% # TO DO: why are duplicates created?
   rename(referenced_id = id,
   referenced_type = type) %>% # Unnesting referenced tweets
-  mutate(referenced_type = replace_na(referenced_type, "no reference"),
-         created_at = with_tz(created_at, "GMT"))
+  mutate(referenced_type = replace_na(referenced_type, "no reference"))
 
 tibble.from %>%
   group_by(referenced_type) %>%
@@ -67,7 +63,6 @@ tibble.to <-  df.to %>%
          keep_empty = TRUE) %>%    # For these tweets, a second row is created when unnesting referenced_tweets.
   rename(referenced_id = id,     # The duplicate will later be deleted when filtering out quotes.
          referenced_type = type) %>% 
-  mutate(referenced_type = tidyr::replace_na(referenced_type, "no reference"),
-         created_at = with_tz(created_at, "GMT"))
+  mutate(referenced_type = tidyr::replace_na(referenced_type, "no reference"))
 
 save(tibble.to, file = "to_tweets_2")

@@ -3,6 +3,7 @@ library(googleLanguageR)
 
 #load documents
 load("media/media.Rdata")
+<<<<<<< HEAD
 load("Data/final_twitter_data/to_tweets_3")
 load("Data/final_twitter_data/from_tweets_3")
 
@@ -12,6 +13,14 @@ tibble.from <- tibble.from[tibble.from$lang=="en",]
 tibble.to <- tibble.to %>% filter(referenced_type == "replied_to" & # Remove quoted tweets/retweets
                                     in_reply_to_user_id != author_id & # Remove tweets to self
                                     lang == "en")
+=======
+load("Data/data_replies_2/to_tweets")
+load("Data/data_tweets_2/from_tweets")
+
+#only keep english tweets
+tibble.from <- tibble.from[tibble.from$lang=="en",]
+tibble.to <- tibble.to[tibble.to$lang=="en",]
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 ### MEDIA ###
 #calculate costs for Google Language API

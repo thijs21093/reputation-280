@@ -13,16 +13,28 @@ library(lmtest)
 library(sandwich)
 library(texreg)
 library(ggeffects)
+<<<<<<< HEAD
 
 
 load("./data/response_tweet.Rda")
 
 # Set time zone
 Sys.setenv(TZ = 'GMT')
+=======
+library(panelr)
+
+load("./data/response_tweet2.Rda")
+
+
+cubic.root <- function(x) {
+  sign(x) * abs(x)^(1/3)
+}
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 # ======================================================
 #           Centering, transformation & description: cross-sectional
 # ======================================================
+<<<<<<< HEAD
 
 # Transformation
 # ======================================================
@@ -51,6 +63,23 @@ response.data <- response.tweet %>%
          twitter.index.30d.s = twitter.index.30d/100,
          twitter.index.90d.s = twitter.index.90d/100,
          twitter.index.365d.s = twitter.index.365d/100,
+=======
+# Transformation
+# ======================================================
+response.data <- response.tweet %>%
+  filter(agencyname != "EIOPA") %>% # Only zeros
+  dplyr::mutate(
+         
+         # Misc.
+        # conversations.log = log2(conversations),
+         sentiment.factor = as.factor(sentiment),
+         agencyyear = paste0(agencyname, "-", year),
+         
+         # Log
+         media.count.1w.log = log2(media.count.1w + 1),
+         twitter.index.1w.cr = cubic.root(twitter.index.1w),
+         comments.1w.log = log(comments.1w + 1),
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
          
          # Scale time on Twitter
          time.on.Twitter.s = time.on.Twitter/365,
@@ -104,6 +133,7 @@ response.data %>%
 #           Cross-sectional fixed effect
 # ======================================================
 
+<<<<<<< HEAD
 # Start with 90 days
 f1.0 <- feglm(response ~ 
                 twitter.index.90d.s + 
@@ -137,10 +167,55 @@ f1.2 <- feglm(response ~ twitter.index.90d.s +
               information.90d.s	+ 
               i(sentiment, ref = "twitter.neutral") + 
               weekend | 
+=======
+# Start with 1 week
+f1.0 <- feglm(response ~ 
+                twitter.valence.1w + 
+                comments.1w +
+                media.count.1w, 
+              family = "logit",
+              data = response.data) 
+
+summary(f1.0)
+
+# Model 1.1: add interactions
+f1.1 <- feglm(response ~ 
+                twitter.valence.1w*comments.1w*media.count.1w, 
+              family = "logit",
+              data = response.data) 
+
+summary(f1.1)
+
+# Model 1.2: Adding controls without missing
+f1.2 <- update(f1.1, . ~ . +
+                 short +
+                 qm.comment +
+                 attachment +
+                 uncivil.tweet +
+                 i(sentiment, ref = "twitter.neutral") +
+                 weekend +
+                 office.hours,
+              family = "logit") 
+
+etable(f1.1, f1.2,
+       fitstat = ~ . + ll + aic) # Fit statistics
+
+# Model 1.3: agency fixed effects
+f1.3 <- feglm(response ~ 
+                twitter.valence.1w*comments.1w*media.count.1w +
+                short +
+                qm.comment +
+                attachment +
+                uncivil.tweet +
+                i(sentiment, ref = "twitter.neutral") +
+                weekend +
+                office.hours | 
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
               agencyname,
               family = "logit",
               data = response.data) 
 
+<<<<<<< HEAD
 # Model 1.3: agency and year fixed effects
 f1.3 <- feglm(response ~ 
                 twitter.index.90d.s + 
@@ -169,10 +244,46 @@ f1.4 <- feglm(response ~
                 information.90d.s	+
                 i(sentiment, ref = "twitter.neutral") +
                 weekend | 
+=======
+summary(f1.3)
+
+
+# Model comparison
+etable(f1.2, f1.3,
+       fitstat = ~ . + ll + aic) # Fit statistics
+
+# Model 1.4: agency and year fixed effects
+f1.4 <- feglm(response ~ 
+                twitter.valence.1w*comments.1w*media.count.1w +
+                short +
+                qm.comment +
+                attachment +
+                uncivil.tweet +
+                i(sentiment, ref = "twitter.neutral") +
+                weekend +
+                office.hours  | 
+                agencyname + year,
+              family = "logit",
+              data = response.data)
+
+summary(f1.4)
+
+# Model 1.5: agency^year fixed effects
+f1.5 <- feglm(response ~ 
+                twitter.valence.1w*comments.1w*media.count.1w +
+                short +
+                qm.comment +
+                attachment +
+                uncivil.tweet +
+                i(sentiment, ref = "twitter.neutral") +
+                weekend +
+                office.hours  | 
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
                 agencyname^year,
               family = "logit",
               data = response.data) 
 
+<<<<<<< HEAD
 # Testing transformation
 
 # Extract dataframe from model 1.4 and rerun 1.2 and 1.3 with that data
@@ -196,11 +307,35 @@ etable(f1.4, f1.4c, fitstat = ~ . + ll + aic) # Fit statistics
 
 # Model comparison
 etable(f1.2m, f1.3m, f1.4,
+=======
+summary(f1.5)
+
+# Model 1.6: agency + year fixed effects, but only agency clustered errors
+f1.6 <- feglm(response ~ 
+                twitter.valence.1w*comments.1w*media.count.1w +
+                short +
+                qm.comment +
+                attachment +
+                uncivil.tweet +
+                i(sentiment, ref = "twitter.neutral") +
+                weekend +
+                office.hours  | 
+                agencyname + year,
+              cluster = c("agencyname", "year"),
+              family = "logit",
+              data = response.data) 
+
+summary(f1.6)
+
+# Model comparison
+etable(f1.4, f1.5, f1.6,
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
        fitstat = ~ . + ll + aic) # Fit statistics
 
 # Which model has the best fit indices?
 # Model 1.3
 
+<<<<<<< HEAD
 # Model 1.5: Adding time on Twitter
 f1.5 <- update(f1.2m,  . ~ . + time.on.Twitter.s)
 
@@ -407,3 +542,109 @@ htmlreg(list(coeftest(glm1.8, vcovCL(glm1.8, cluster= ~ agencyname)),
         digits = 3,
         include.pvalues = TRUE,
         file = "glm.html")
+=======
+# Model 1.5: Adding controls with some missingness
+f1.7 <- update(f1.4, . ~ . +
+                mention +
+                qm.agency,
+                data = response.data) 
+
+etable(f1.7, fitstat = ~ . + ll + aic)
+
+
+models <- list(
+  "Model 1.0" = feglm(response ~ 
+                        twitter.valence.1w + comments.1w + media.count.1w | 
+                        agencyname + year,
+                      family = "logit",
+                      data = response.data),
+  "Model 1.1" = feglm(response ~ 
+                        twitter.valence.1w*comments.1w*media.count.1w| 
+                        agencyname + year,
+                      family = "logit",
+                      data = response.data),
+  "Model 1.2" = feglm(response ~ 
+                        twitter.valence.1w*comments.1w*media.count.1w +
+                        short +
+                        qm.comment +
+                        attachment +
+                        uncivil.tweet +
+                        i(sentiment, ref = "twitter.neutral") +
+                        weekend +
+                        office.hours  | 
+                        agencyname + year,
+                      family = "logit",
+                      data = response.data))
+
+modelsummary(models,
+             estimate = "{estimate} ({std.error})",
+             statistic = "p = {p.value}") # https://vincentarelbundock.github.io/modelsummary/articles/modelsummary.html
+
+plot_model(f1.4, type = "pred", terms = c("comments.1w [all]", "twitter.valence.1w", "media.count.1w"))
+
+models2 <- list(
+  "Model 2.0" = feglm(response ~ 
+                        twitter.index.1w + media.count.1w | 
+                        agencyname + year,
+                      family = "logit",
+                      data = response.data),
+  "Model 2.1" = feglm(response ~ 
+                        twitter.index.1w*media.count.1w | 
+                        agencyname + year,
+                      family = "logit",
+                      data = response.data),
+  "Model 2.2" = feglm(response ~ 
+                        twitter.index.1w*media.count.1w +
+                        short +
+                        qm.comment +
+                        attachment +
+                        uncivil.tweet +
+                        i(sentiment, ref = "twitter.neutral") +
+                        weekend +
+                        office.hours  | 
+                        agencyname + year,
+                      family = "logit",
+                      data = response.data))
+
+modelsummary(models2,
+             estimate = "{estimate} ({std.error})",
+             statistic = "p = {p.value}") # https://vincentarelbundock.github.io/modelsummary/articles/modelsummary.html
+
+f2.2 <- feglm(response ~ 
+                twitter.index.1w*media.count.1w +
+                short +
+                qm.comment +
+                attachment +
+                uncivil.tweet +
+                i(sentiment, ref = "twitter.neutral") +
+                weekend +
+                office.hours  | 
+                agencyname + year,
+              family = "logit",
+              data = response.data)
+
+plot_model(f2.2,
+           type = "pred", 
+           terms = c("twitter.index.1w [all]", "media.count.1w [quart]"))
+
+f2.2a <- feglm(response ~ 
+                media.count.1w.log*twitter.index.cr +
+                short +
+                qm.comment +
+                attachment +
+                uncivil.tweet +
+                i(sentiment, ref = "twitter.neutral") +
+                weekend +
+                office.hours  | 
+                agencyname + year,
+              family = "logit",
+              data = response.data)
+
+etable(f2.2, f2.2a,
+       fitstat = ~ . + ll + aic) # Fit statistics
+summary(f2.2a)
+
+plot_model(f2.2a,
+           type = "pred", 
+           terms = c("media.count.1w.log [all]", "twitter.valence.1w [quart]", "comments.1w.log [meansd]"))
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e

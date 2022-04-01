@@ -15,6 +15,7 @@ library(glmmTMB)
 library(performance)
 library(lmtest)
 library(DHARMa)
+<<<<<<< HEAD
 
 # Set time zone
 Sys.setenv(TZ = 'GMT')
@@ -35,6 +36,17 @@ load("./data/response_panel.Rda")
 # twitter.valence = twitter.praise - twitter.criticism
 # time.on.Twitter = difftime(strptime(week, format = "%Y-%m-%d"), strptime(join.day, format = "%Y-%m-%d"), units = c("weeks"))
 
+=======
+library(texreg)
+library(interactions)
+library(effects)
+
+# To do:
+# Check other operationalisations of twitter sentiment (e.g., moar, etc.)
+# Set time zone
+
+load("./data/response_panel2.Rda")
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 # ======================================================
 #           Panel agency-by-week
 # ======================================================
@@ -47,6 +59,7 @@ panel.new <- response.panel %>%
   mutate(week.factor = as.factor(week),
          week.number = as.numeric(week.factor)) %>%
   filter(agencyname != "EIOPA") %>% # Only zeros
+<<<<<<< HEAD
   dplyr::mutate(
         # Scale information
     information.s = information/100,
@@ -131,6 +144,17 @@ panel.new <- response.panel %>%
          media.source26.log = log2(media.source26 + 1),
          media.source52.log = log2(media.source52 + 1),
          
+=======
+  arrange(agencyname, week.number) %>%
+  group_by(agencyname) %>%
+  dplyr::mutate(
+         
+         # Cubic root
+         twitter.index1.cr = cubic.root(twitter.index1),
+        
+         # Media count log
+         media.source1.log = log10(media.source1 + 1),
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
          interaction1.conv = media.source1*twitter.index1) %>%
   ungroup() %>%
   drop_na(media.source1)
@@ -139,6 +163,7 @@ data.wb.temp <-  cbind(panel.new,
                   datawizard::demean(panel.new, 
                       select =
                       c("twitter.index1", 
+<<<<<<< HEAD
                         "twitter.index1.cr", 
                         "media.source1", 
                         "media.source1.log",
@@ -151,6 +176,15 @@ data.wb.temp <-  cbind(panel.new,
 data.wb <- cbind(data.wb.temp,
                  datawizard::demean(data.wb.temp,
                                     select = c("interaction1.double", "interaction1.trans_double", "interaction1.log_double", "interaction1_4.double"),
+=======
+                        "media.source1"),
+                        group = "agencyname")) %>%
+  mutate(interaction1.double = media.source1_within*twitter.index1_within)
+
+data.wb <- cbind(data.wb.temp,
+                 datawizard::demean(data.wb.temp,
+                                    select = c("interaction1.double"),
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
                                     group = "agencyname")) 
 
 
@@ -210,6 +244,20 @@ var.between %>%
 panel <- panel_data(panel.new, id = agencyname, wave = time.on.Twitter) 
 pdim(panel)
 
+<<<<<<< HEAD
+=======
+# ????
+data.alt <- make_wb_data(response.week ~ media.source1*twitter.index1,
+                 offset = log(offset.week + 1),
+                 data = panel,
+                 wave = TRUE,
+                 detrend = TRUE,
+                 balance.correction = TRUE,
+                 model = "w-b",
+                 interaction.style = "double-demean",
+                 family = "poisson")
+
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 # ======================================================
 #           Panel
 # ======================================================
@@ -233,6 +281,28 @@ p1p.no.trend <- wbm(response.week ~ media.source1*twitter.index1,
 summary(p1p.no.trend)
 
 # Checking the effect of detrending: poisson (panelr)
+<<<<<<< HEAD
+=======
+p2p.int.plot <- glmmTMB(response.week ~ 1 +
+                media.source
+                 offset(log(offset.week + 1)) +
+                 (1 | agencyname),
+               data = data.wb,
+               family = poisson)
+summary(p0g)
+
+
+summary(p2p.int.plot)
+
+interact_plot(p2p.int.plot,
+                   modx = media.source1,
+                   pred = twitter.index1)
+
+plot_model(p2p.int.plot, "int") 
+plot_model(p2p.int.plot, type = "pred", terms = c("media.source1", "media.source1"))
+
+# Checking the effect of detrending: poisson (panelr)
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 p1p.trend <- wbm(response.week ~ media.source1*twitter.index1,
            offset = log(offset.week + 1),
            data = panel,
@@ -428,12 +498,17 @@ nb2.7g <- glmmTMB(response.week ~
                     offset(log(offset.week + 1)) +
                     (1 | agencyname) +
                     ar1(0 + week.factor | agencyname),
+<<<<<<< HEAD
                   ziformula = ~ (1 | agencyname),
+=======
+                  ziformula = ~ 1,
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
                   data = data.wb,
                   family = nbinom2)
 
 summary(nb2.7g)
 compare_performance(nb2.6g, nb2.7g, metrics = c("AIC", "BIC", "ICC"))
+<<<<<<< HEAD
 lrtest(nb2.6g, nb2.7g)
 
 # Transformed media variable  (glmmTMB)
@@ -442,22 +517,132 @@ nb2.8g <- glmmTMB(response.week ~
                     media.source4_within +
                     interaction1_4.double_within +
                     twitter.index1_between +
+=======
+lrtest(nb2.g, nb2.7g)
+
+# Now with transformed Twitter index (glmmTMB)
+nb2.8g <- glmmTMB(response.week ~
+                    twitter.index1.cr_within +
+                    media.source1_within +
+                    interaction1.cr_within +
+                    twitter.index1.cr_between +
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
                     media.source1_between +
                     poly(time.on.Twitter, 2) +
                     offset(log(offset.week + 1)) +
                     (1 | agencyname) +
                     ar1(0 + week.factor | agencyname),
+<<<<<<< HEAD
                   ziformula = ~ (1 | agencyname),
+=======
+                  ziformula = ~ 1,
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
                   data = data.wb,
                   family = nbinom2)
 
 summary(nb2.8g)
+<<<<<<< HEAD
+=======
+compare_performance(nb2.6g, nb2.7g, metrics = c("AIC", "BIC", "ICC"))
+lrtest(nb2.6g, nb2.7g)
+
+
+# Model for plotting interaction (simple)
+nb2.7g.inta <- glmmTMB(response.week ~
+                         media.source1_within*twitter.index1_within +
+                    offset(log(offset.week + 1)) +
+                    (1 | agencyname),
+                  data = data.wb,
+                  family = nbinom2)
+
+summary(nb2.7ga)
+compare_performance(nb2.7g, nb2.7ga, metrics = c("AIC", "BIC", "ICC"))
+lrtest(nb2.7g, nb2.7ga)
+
+# Model for plotting interaction (glmmTMB)
+nb2.7g.intb <- glmmTMB(response.week ~
+                    twitter.index1_within*media.source1_within +
+                    twitter.index1_between +
+                    media.source1_between +
+                    poly(time.on.Twitter, 2) +
+                    offset(log(offset.week + 1)) +
+                    (1 | agencyname) +
+                    ar1(0 + week.factor | agencyname),
+                  ziformula = ~ 1,
+                  data = data.wb,
+                  family = nbinom2)
+
+summary(nb2.7g.intb)
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 ## MODEL EVALUATION
 testDispersion(nb2.7g)
 testDispersion(nb2.8g)
+<<<<<<< HEAD
 testDispersion(nb2.test)
 
+=======
+
+# Extracting information
+
+## Poisson
+extract.nb2.7g <- texreg::extract(nb2.7g,  include.variance = TRUE)
+
+# Calculating IRRs
+coefs <- extract.nb2.7g@coef
+exp.coefs <- exp(extract.nb2.7g@coef)
+
+# Combined: Poisson
+htmlreg(list(extract.nb2.7g),
+        custom.model.names = c("Model"),
+        caption = "TABLE: Generalized Linear Mixed Models (GLMM) with AR1 covariance structure.",
+        caption.above = TRUE,
+        ci.force = TRUE,
+        ci.test = 0,
+        ci.force.level = 0.95,
+        bold = TRUE,
+        float.pos = "h",
+        booktabs = TRUE,
+        custom.note = "Note:.",
+        digits = 3,
+        include.pvalues = TRUE, 
+        single.row = TRUE,
+        file = 'zi-nb2.doc')
+
+# ======================================================
+#           EFFECTS
+# ======================================================
+
+
+## Note: Check if offset is incorporated correctly in plots
+plot_model(nb2.7g.intb,
+                               type = "int",
+                               show.legend = TRUE,
+                               line.size = 1,
+                               mdrt.values = "meansd",
+                               ci.lvl = NA) +
+  theme_few()  +
+  theme(legend.position = c(.2, .8),
+        legend.background = element_rect(colour = "black", fill = "white"))
+
+ae <- allEffects(nb2.7g, se = FALSE)
+plot(ae)
+
+# Twitter
+plot_model(nb2.7g,  type = "eff", terms = "twitter.index1_within", ci.lvl = NA) 
+plot_model(nb2.7g,  type = "eff", terms = "twitter.index1_between", ci.lvl = NA) 
+
+# Media
+plot_model(nb2.7g,  type = "eff", terms = "media.source1_within", ci.lvl = NA) 
+plot_model(nb2.7g,  type = "eff", terms = "media.source1_between", ci.lvl = NA) 
+
+# Time
+plot_model(nb2.7g,  type = "eff", terms = "time.on.Twitter", ci.lvl = NA) 
+interact_plot(nb2.7g,
+              modx = twitter.index1_within,
+              pred = media.source1_within,
+              data = data.wb)
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 # Simulate residuals
 simulation.nb2.7g <- simulateResiduals(fittedModel = nb2.7g, plot = F)
@@ -481,6 +666,11 @@ testZeroinflation() # tests if there are more zeros in the data than expected fr
 
 ## Plotting the interaction
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 # balance.correction	& detrend
 # Adjust within-subject effects for trends in the predictors? Default is FALSE, but some research suggests this is a better idea (see Curran and Bauer (2011) reference).
 # Correct between-subject effects for unbalanced panels following the procedure in Curran and Bauer (2011)? Default is FALSE

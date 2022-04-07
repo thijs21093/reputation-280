@@ -39,9 +39,40 @@ cubic.root <- function(x) {
 # ======================================================
 <<<<<<< HEAD
 
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 
+=======
+# Transformation
+# ======================================================
+response.data <- response.tweet %>%
+  filter(same.message == 0 & # Difficult to model, so better to remove altogether
+         agencyname != "EIOPA") %>% # Only zeros
+  dplyr::mutate(
+         
+         # Misc.
+         conversations.log = log2(conversations),
+         sentiment.factor = as.factor(sentiment),
+         agencyyear = paste0(agencyname, "-", year),
+         
+         # Media count
+         media.count.30d.log = log2(media.count.30d + 1),
+         media.count.90d.log = log2(media.count.90d + 1),
+         media.count.365d.log = log2(media.count.365d + 1),
+         
+         # Scale information
+         information.1w.s = information.1w/100,
+         information.30d.s = information.30d/100,
+         information.90d.s = information.90d/100,
+         information.365d.s = information.365d/100,
+         
+         # Scale Twitter index
+         twitter.index.30d.s = twitter.index.30d/100,
+         twitter.index.90d.s = twitter.index.90d/100,
+         twitter.index.365d.s = twitter.index.365d/100,
+=======
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 # Transformation
 # ======================================================
 response.data <- response.tweet %>%
@@ -662,6 +693,7 @@ plot_model(f2.2a,
            type = "pred", 
            terms = c("media.count.1w.log [all]", "twitter.valence.1w [quart]", "comments.1w.log [meansd]"))
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 # ======================================================
 #            Random
@@ -750,6 +782,9 @@ r1.4 <- glmmTMB(response ~
 summary(r1.4)
 anova(r1.2, r1.4)
 tab_model(r1.2, r1.4)
+=======
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 =======
 >>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 >>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c

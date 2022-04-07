@@ -9,6 +9,9 @@ library(lubridate)
 # Set time zone
 Sys.setenv(TZ = 'GMT')
 
+<<<<<<< HEAD
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
+=======
 >>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 # ======================================================
 #           From agencies
@@ -36,8 +39,11 @@ tibble.from <-  df %>%
   unnest(cols = referenced_tweets, # Note: Some tweets are both quotes and replies to statuses.
          keep_empty = TRUE) %>%    # For these tweets, a second row is created when unnesting referenced_tweets.
 <<<<<<< HEAD
+<<<<<<< HEAD
   rename(referenced_id = id, # Duplicates are filtered out later.
 =======
+=======
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   distinct(tweet_id, .keep_all = TRUE) %>% # TO DO: why are duplicates created?
   rename(referenced_id = id,
 >>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c

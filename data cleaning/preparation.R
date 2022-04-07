@@ -17,8 +17,11 @@ library(tm)
 library(qdapRegex)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
+=======
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 # Set time zone
 Sys.setenv(TZ = 'GMT')
 =======
@@ -211,11 +214,14 @@ start <- joining.date %>%
 #           Preparing dataframe
 # ======================================================
 <<<<<<< HEAD
+<<<<<<< HEAD
 to.agency <- tweetsTO_final %>%
             unnest(cols = public_metrics, # Unnest public metrics
                   keep_empty = TRUE)%>%
 =======
 <<<<<<< HEAD
+=======
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 
 to.agency <- tibble.to %>%
   filter(agencyname != "FRA") %>% # To do: add FRA
@@ -358,6 +364,12 @@ uncivil.list <- corpus.dtm$i %>% as_tibble() %>%
 <<<<<<< HEAD
 =======
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+to.agency3$hours
+
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 =======
 to.agency3$hours
 
@@ -368,9 +380,15 @@ to.agency3$hours
 response <- to.agency3 %>%
   
 <<<<<<< HEAD
+<<<<<<< HEAD
   
 =======
 <<<<<<< HEAD
+  # Same message
+  dplyr::mutate(same.message = case_when(
+=======
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
+=======
   # Same message
   dplyr::mutate(same.message = case_when(
 =======
@@ -628,6 +646,7 @@ consequences.week <- consequences %>%
 =======
   mutate(week = as.POSIXct(week, format = "%Y-%m-%d"),
 <<<<<<< HEAD
+<<<<<<< HEAD
          twitter.index = 0.9*plus09 +
                          0.8*plus08 +
                          0.7*plus07 +
@@ -647,6 +666,8 @@ consequences.week <- consequences %>%
                          0.8*min08 -
                          0.9*min09)
 =======
+=======
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 >>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
          twitter.index = twitter.praise - twitter.criticism)
 >>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
@@ -659,12 +680,18 @@ twitter.day <- information.day %>%
   full_join(consequences.day,  by = c("agencyname", "day")) %>%
   full_join(media.day, by = c("agencyname", "day")) %>%
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
+=======
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   full_join(media.sentiment.day,  by = c("agencyname", "day")) %>%
 =======
  # full_join(media.sentiment.day,  by = c("agencyname", "day")) %>%
 >>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
+<<<<<<< HEAD
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
+=======
 >>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   full_join(responsiveness.day,  by = c("agencyname", "day")) %>%
   full_join(joining.date, by = "agencyname") %>%
@@ -857,6 +884,7 @@ twitter.week <- information.week %>%
   
   full_join(media.week, by = c("agencyname", "week")) %>%
 <<<<<<< HEAD
+<<<<<<< HEAD
   full_join(joining.date, by = "agencyname")
 
 #           Putting it all together
@@ -864,6 +892,8 @@ twitter.week <- information.week %>%
 response.panel <- response2 %>%
 =======
 <<<<<<< HEAD
+=======
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   full_join(media.sentiment.week,  by = c("agencyname", "week")) %>%
 =======
  # full_join(media.sentiment.week,  by = c("agencyname", "week")) %>%
@@ -896,6 +926,9 @@ response.panel <- sentiment.data %>%
 =======
  # filter(same.message == 0) %>% # Remove 'same message' tweets?
 >>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
+<<<<<<< HEAD
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
+=======
 >>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   group_by(agencyname,
            week = cut(day, "week"),

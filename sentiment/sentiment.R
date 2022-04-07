@@ -17,12 +17,78 @@ Sys.setenv(TZ = 'GMT')
 
 #load documents
 load("media/media_articles.Rdata")
-load("from_tweets_2")
-load("to_tweets_2")
+load("from_tweets_3")
+load("to_tweets_3")
+
 
 #only keep english tweets
 tibble.from <- tibble.from[tibble.from$lang=="en",]
-tibble.to <- tibble.to[tibble.to$lang=="en",]
+tibble.to <- tibble.to %>% filter(referenced_type == "replied_to" & # Remove quoted tweets/retweets
+                               in_reply_to_user_id != author_id & # Remove tweets to self
+                               lang == "en")
+
+#clean text of tweets
+tibble.to$text_new <- str_replace_all(tibble.to$text," "," ") %>% str_remove_all(" ?(f|ht)(tp)(s?)(://)(.*)[.|/](.*)") %>% str_remove_all("@[[:alnum:]_]{4,}") %>% str_replace_all("&amp;", "and") %>%  str_trim("both") %>% str_remove_all("^RT:? ")
+
+
+### CLASSIFY TO.TWEETS
+tweet_results <- split(tibble.to, tibble.to$agencyhandle)
+
+#try small sample
+#tweetlist_sample <- list()
+#set.seed(1993)
+#for (i in 1:length(tweet_results)){
+  tweetlist_sample[[i]] <- tweet_results[[i]][sample(nrow(tweet_results[[i]]), 10), ]
+}
+
+#tweet_output <- list()
+#tweet_output_csvs <- list()
+
+#below loop is run in chunks. done so far=1:3, 4:6, 7:15, 16:26
+for (i in 16:26) {
+  print(paste0(tweet_results[[i]][1, ]$agencyhandle))
+  data <- tweet_results[[i]]
+  output <- gl_nlp(
+    data$text_new,
+    nlp_type = "analyzeSentiment",
+    type = c("HTML"),
+    language = c("en")
+  )
+  output_df <-
+    data.frame(
+      text = output$text,
+      magnitude = output$documentSentiment$magnitude,
+      score = output$documentSentiment$score,
+      name = paste0(tweet_results[[i]][1, ]$agencyhandle)
+    ) #create df from output list
+  tweet_output[[i]] <- output #add list to list of lists
+  tweet_output_csvs[[i]] <- output_df #add list to list of csvs
+  save(output, file = paste0(
+    "sentiment/data/",
+    paste0(tweet_results[[i]][1, ]$agencyhandle),
+    ".RData"
+  )) #save current batch of HDD
+  write.csv(output_df, file = paste0(
+    "sentiment/data/",
+    paste0(tweet_results[[i]][1, ]$agencyhandle),
+    ".csv"
+  )) #save current batch on HDD
+}
+
+save(tweet_output, file="sentiment/data/tweetoutput.RData")
+save(tweet_output_csvs, file="sentiment/data/tweetoutput_csv.RData")
+
+# merge output and original data
+for (i in 1:length(tweet_results)){
+  tweet_results[[i]]$score <- tweet_output_csvs[[i]]$score
+  tweet_results[[i]]$magnitude <- tweet_output_csvs[[i]]$magnitude
+  tweet_results[[i]]$reftext <-  tweet_output_csvs[[i]]$text
+  tweet_results[[i]]$refagency <- tweet_output_csvs[[i]]$name
+}
+
+tweetsTO_final <- bind_rows(tweet_results)
+
+save(tweetsTO_final, file="sentiment/data/tweetsTO_final.RData")
 
 # combine headings and text in media df to retrieve as many references to the agencies as possible
 media$complete_text <- paste(paste0(media$heading, "."), media$text)

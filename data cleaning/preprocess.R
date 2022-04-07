@@ -3,7 +3,13 @@ library(dplyr)
 library(tidyr)
 library(lubridate)
 
+<<<<<<< HEAD
+=======
 
+# Set time zone
+Sys.setenv(TZ = 'GMT')
+
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 # ======================================================
 #           From agencies
 # ======================================================
@@ -12,7 +18,8 @@ library(lubridate)
 rm(list = ls())
 
 # Data
-load(file="./Data/alltweets3") # Data
+load(file="./Data/data_tweets_4/alltweets4") # Data
+
 
 # Create dataframe
 for (i in seq(alltweets)){
@@ -28,15 +35,22 @@ tibble.from <-  df %>%
   rename(tweet_id = id) %>% # rename to avoid conflicting names
   unnest(cols = referenced_tweets, # Note: Some tweets are both quotes and replies to statuses.
          keep_empty = TRUE) %>%    # For these tweets, a second row is created when unnesting referenced_tweets.
+<<<<<<< HEAD
+  rename(referenced_id = id, # Duplicates are filtered out later.
+=======
+  distinct(tweet_id, .keep_all = TRUE) %>% # TO DO: why are duplicates created?
   rename(referenced_id = id,
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   referenced_type = type) %>% # Unnesting referenced tweets
-  mutate(referenced_type = replace_na(referenced_type, "no reference"))
+  mutate(referenced_type = replace_na(referenced_type, "no reference"),
+         created_at = with_tz(created_at, "GMT"))
 
 tibble.from %>%
-  group_by(referenced_type) %>%
+  group_by(referenced_type) %>% 
   dplyr::summarise(count = n()) # Count
 
-save(tibble.from, file = "from_tweets_2")
+save(tibble.from, file = "from_tweets_3")
+
 
 # ======================================================
 #           Replies to agencies
@@ -46,7 +60,9 @@ save(tibble.from, file = "from_tweets_2")
 rm(list = ls())
 
 # Data
-load(file = "./Data/all_replies_3") # Data, set path
+
+load(file = "./Data/data_replies_5/allreplies_5") # Data, set path
+
 
 # Create dataframe
 for (i in seq(allreplies)){
@@ -63,6 +79,9 @@ tibble.to <-  df.to %>%
          keep_empty = TRUE) %>%    # For these tweets, a second row is created when unnesting referenced_tweets.
   rename(referenced_id = id,     # The duplicate will later be deleted when filtering out quotes.
          referenced_type = type) %>% 
-  mutate(referenced_type = tidyr::replace_na(referenced_type, "no reference"))
+  mutate(referenced_type = tidyr::replace_na(referenced_type, "no reference"),
+         created_at = with_tz(created_at, "GMT"))
 
-save(tibble.to, file = "to_tweets_2")
+save(tibble.to, file = "to_tweets_3")
+
+

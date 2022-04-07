@@ -16,31 +16,69 @@ library(stringi)
 library(tm)
 library(qdapRegex)
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+# Set time zone
+Sys.setenv(TZ = 'GMT')
+=======
 # https://stackoverflow.com/questions/57255851/sum-count-between-two-dates-in-r
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 # Tweets
-load(file = "./data (not public)/from_tweets/from_tweets_2")
-load(file = "./data (not public)/to_tweets/to_tweets_2")
+load(file = "./data (not public)/from_tweets/from_tweets_3")
+load(file = "./data (not public)/to_tweets/tweetsTO_final.RData")
 
 # Media count
+<<<<<<< HEAD
+load("./data (not public)/media - outputs/media_day.Rdata")
+load("./data (not public)/media - outputs/media_week.Rdata")
+
+# Media valence
+load("./data (not public)/media - outputs/media.sentiment_day.Rdata")
+load("./data (not public)/media - outputs/media.sentiment_week.Rdata")
+=======
 load("./data (not public)/media - outputs/media_day2.Rdata")
 load("./data (not public)/media - outputs/media_week2.Rdata")
 
+<<<<<<< HEAD
+=======
 # Media valence
 # load("./data (not public)/media - outputs/media.sentiment_day.Rdata")
 # load("./data (not public)/media - outputs/media.sentiment_week.Rdata")
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 media.day <- media.day %>%
   dplyr::rename(agencyname = acronym)
 
 media.week <- media.week %>%
   dplyr::rename(agencyname = acronym) 
 
+<<<<<<< HEAD
+media.sentiment.day <- media.sentiment.day %>%
+  dplyr::rename(agencyname = acronym)  %>%
+  mutate(day = round(as.POSIXct(day), "day")) # Remove this line when new sentiment analysis is available
+
+media.sentiment.week <- media.sentiment.week %>%
+  dplyr::rename(agencyname = acronym) %>%
+  mutate(week = round(as.POSIXct(week), "day")) # Remove this line when new sentiment analysis is available
+
+=======
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 # ======================================================
 #           Information
 # ======================================================
-
 from.agency <- tibble.from %>%
+<<<<<<< HEAD
+ filter(agencyname != "FRA") %>% # To do: add FRA
+ arrange(referenced_type != 'replied_to') %>% # Remove 'quoted' if 'replied to' is present for same tweet id
+  distinct(tweet_id, .keep_all = TRUE) %>%
+  mutate(url = paste0("www.twitter.com/", author_id, "/status/", tweet_id),  # Add url
+         created_at = round(with_tz(as.Date(created_at),  "GMT"),  "days"),
+         text = textutils::HTMLdecode(text)) # Decode html
+=======
  arrange(referenced_type != 'replied_to') %>% # Remove 'quoted' if 'replied to' is present for same tweet id
   distinct(tweet_id, .keep_all = TRUE) %>%
   mutate(text = textutils::HTMLdecode(text),
@@ -51,6 +89,7 @@ from.agency <- tibble.from %>%
           week.earlier = date.time - weeks(1),
           interval = interval(week.earlier, date.time)) %>%
   arrange(date.time)
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 # Check for duplicates
 from.agency %>% 
@@ -114,7 +153,11 @@ information.day <- information %>%
             day = cut(created_at, "day"),
            .drop = FALSE) %>%
   summarise(information = n()) %>%
+<<<<<<< HEAD
+  mutate(day = as.POSIXct(day))
+=======
   mutate(day = as.POSIXct(day, format = "%Y-%m-%d"))
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 # Information per week
 information.week <- information %>%
@@ -122,18 +165,25 @@ information.week <- information %>%
            week = cut(created_at, "week"),
            .drop = FALSE) %>%
   summarise(information = n()) %>%
+<<<<<<< HEAD
+  mutate(week = as.POSIXct(week))
+=======
   mutate(week = as.POSIXct(week, format = "%Y-%m-%d"))
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 # ======================================================
 #           Find first activity (joining date)
 # ======================================================
-
 joining.date <- from.agency %>%
   group_by(agencyname,
            join.day = cut(created_at, "day"),
            .drop = FALSE) %>%
   summarise(information = n()) %>%
+<<<<<<< HEAD
+  mutate(join.day = as.POSIXct(join.day)) %>% 
+=======
   mutate(join.day = as.POSIXct(join.day, format = "%Y-%m-%d")) %>% 
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
   group_by(agencyname = factor(agencyname)) %>% 
   filter(any(information == 0)) %>% 
   filter(information != 0) %>% 
@@ -147,7 +197,11 @@ joining.date <- from.agency %>%
 start <- joining.date %>% 
   slice_min(join.day, n = 1) %>%
   dplyr::select(join.day) %>% # 2009-03-01
+<<<<<<< HEAD
+  mutate(join.day = format(join.day, "%Y-%m-%d")) %>%
+=======
   mutate(join.day = format(join.day, format = "%Y-%m-%d")) %>%
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
   as.character()                  
 
 # ======================================================
@@ -156,7 +210,26 @@ start <- joining.date %>%
 
 #           Preparing dataframe
 # ======================================================
+<<<<<<< HEAD
+to.agency <- tweetsTO_final %>%
+            unnest(cols = public_metrics, # Unnest public metrics
+                  keep_empty = TRUE)%>%
+=======
+<<<<<<< HEAD
+
 to.agency <- tibble.to %>%
+  filter(agencyname != "FRA") %>% # To do: add FRA
+  unnest(cols = attachments, # Unnest attachment
+                  keep_empty = TRUE) %>%
+  filter(referenced_type == "replied_to" & # Remove quoted tweets/retweets
+           in_reply_to_user_id != author_id & # Remove tweets to self
+           lang == "en") %>% # Remove non-English tweets
+  mutate(created_at = as.POSIXct(created_at),
+         text = textutils::HTMLdecode(text), # Decode html
+         url = paste0("www.twitter.com/", author_id, "/status/", tweet_id))  # Add url
+=======
+to.agency <- tibble.to %>%
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
            unnest(cols = attachments, # Unnest attachment
                   keep_empty = TRUE) %>%
            filter(referenced_type == "replied_to" & # Remove quoted tweets/retweets
@@ -188,6 +261,7 @@ to.agency <- tibble.to %>%
 #               select(tweet_id, n)),
 #               by = "tweet_id") %>%
 #                    rename(seven.days = n)
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 # Check for duplicates
 to.agency %>%
@@ -209,7 +283,6 @@ response.filter.comment <- from.agency %>%
   filter(!is.na(referenced_id)) %>%
     dplyr::select(referenced_id2) %>% 
     as.list()
-
 
 #           Adding joining date and conversation length
 # ======================================================
@@ -282,12 +355,26 @@ uncivil.list <- corpus.dtm$i %>% as_tibble() %>%
   rename(doc_id = value) %>%
   as.list()
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
 to.agency3$hours
 
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 #           Adding other variables
 # ======================================================
 response <- to.agency3 %>%
   
+<<<<<<< HEAD
+  
+=======
+<<<<<<< HEAD
+  # Same message
+  dplyr::mutate(same.message = case_when(
+=======
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   # Office hours
   dplyr::mutate(office.hours = case_when(
     hour >= 8 & hour < 18 ~ 1, # Code as 1 when tweet was posted between 8:00 & 18:00 CET/CEST
@@ -295,6 +382,7 @@ response <- to.agency3 %>%
     
   # Same message
   same.message = case_when(
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
     tweet_id %in% same.message[["tweet_id"]] ~ 1, # Code as 1 when same text from the same author exist in data
     !tweet_id %in% same.message[["tweet_id"]] ~ 0), # Code 0 if not
 
@@ -308,7 +396,12 @@ response <- to.agency3 %>%
       doc_id %in% uncivil.list[["doc_id"]] ~ 1, # Code as 1 if uncivil
       !doc_id %in% uncivil.list[["doc_id"]] ~ 0), # Code 0 if not
   
+<<<<<<< HEAD
+  
+  # Did the agency respond with a comment?
+=======
     # Did the agency respond with a comment?
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
   response.comment = case_when(
     tweet_id2 %in% response.filter.comment[["referenced_id2"]] ~ 1, # Code as 1 when tweet is AT LEAST ONCE commented on by the agency
     !tweet_id2 %in% response.filter.comment[["referenced_id2"]] ~ 0), # Code as 0 if not
@@ -341,16 +434,36 @@ response <- to.agency3 %>%
                        units = c("days")) %>% # Number of days passed since start
     round(0) %>% # Ignore differences because of summer/winter time
     as.numeric(), # Numeric
+<<<<<<< HEAD
+  
+  # ALL CAPS
+  cap = stringi::stri_count_regex(text.url, grab("@rm_caps")),
+  cap.perc = cap/ngrams,
+  cap.dummy = case_when(
+           cap.perc >= 0.5 ~ 1,
+           cap.perc < 0.5 ~ 0),
+  
+  # Year and month
+  year =  format(as.POSIXct(created_at), format= "%Y"), 
+  month =  format(as.POSIXct(created_at), format= "%m-%Y"),
+  
+=======
  
   # Year and month
   year =  format(as.POSIXct(created_at), format= "%Y"), 
+  
+  weighted.score = score*magnitude,
 
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
   # weekend versus weekday
          weekday = weekdays(as.POSIXct(created_at)), 
          weekend = case_when(
            weekday == "zaterdag" ~ 1, # Saturday
            weekday == "zondag" ~ 1,   # Sunday
            TRUE ~ 0))
+
+response %>% select(c(score, weighted.score)) %>%
+ descr()
 
 # ======================================================
 #           Constructing variables: from tweets
@@ -378,7 +491,8 @@ mentions <- from.agency %>%
 #           Mention/question mark
 # ======================================================
 engaging <- from.agency %>%
-    # Does contain a mention?
+   
+   # Does contain a mention?
     mutate(mention = case_when(
       tweet_id %in% mentions[["tweet_id"]] ~ 1, # Code as 1 if tweet mentions AT LEAST one user
       !tweet_id %in% mentions[["tweet_id"]] ~ 0), # Code as 0 if not
@@ -403,7 +517,7 @@ response2 <- response %>%
 
 response2 %>%
   select(c(mention, qm.agency)) %>% 
-  descr # 0.87% missing
+  descr # 0.8% missing
 
 
 #           count comments/responses per day
@@ -414,7 +528,11 @@ responsiveness.day <- response2 %>%
            .drop = FALSE) %>%
   dplyr::summarise(comments.count = n(),
                    responses.count = sum(response)) %>%
+<<<<<<< HEAD
+  mutate(day = as.POSIXct(day))
+=======
   mutate(day = as.POSIXct(day, format = "%Y-%m-%d"))
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 # ======================================================
 #           Description of response variable
@@ -449,116 +567,89 @@ response2 %>%
 # Note: Missingness is caused by tweets that no longer exist (i.e., deleted) or 
 # that have not been returned by the API. 
 
-#           Table with responsiveness per agency-halfyear     
-# ======================================================
-response.agency <- response2 %>% 
-  group_by(response, agencyname) %>%
-  mutate(response = case_when(
-    response == 1 ~ "response",
-    response == 0 ~ "no.response")) %>%
-  tally() %>% 
-  tidyr::pivot_wider(names_from = response, 
-                     values_from = n,
-                     values_fill	= 0) %>%
-  group_by(agencyname) %>%            # Group by the binning variable
-  summarise(no.response = sum(no.response),
-            response = sum(response)) %>%
-  mutate(ratio = response/(response + no.response))
-
-#           Plot
-# ======================================================
-response.plot <- response2 %>% 
-  group_by(response, agencyname, day) %>%
-  mutate(response = case_when(
-    response == 1 ~ "response",
-    response == 0 ~ "no.response")) %>%
-  tally() %>% 
-  tidyr::pivot_wider(names_from = response, 
-                     values_from = n,
-                     values_fill	= 0) %>%
-  mutate(halfyear = as.Date(lubridate::floor_date(day, unit = "halfyear"))) %>%
-  group_by(halfyear, agencyname) %>%            # Group by the binning variable
-  summarise(no.response = sum(no.response),
-            response = sum(response)) %>%
-  group_by(agencyname) %>% 
-  mutate(max = case_when(
-    max(no.response) > max(response) ~ max(no.response),
-    max(response) > max(no.response) ~ max(response)),
-        response.rate = paste0(round(sum(response)/(sum(response) + sum(no.response)) * 100, 2), "%")) %>% 
-  ungroup() %>%
-  arrange(max) %>%               # Sort dataframe
-  mutate(agencyname = factor(agencyname, unique(agencyname))) # Reset factor-column based on that order
-
-# Creating a plot 
-response.plot %>%
-  ggplot(aes(x = halfyear)) +  
-  facet_wrap(facets = . ~ agencyname,  nrow = 9, scales = "free_y") +
-  geom_point(aes(y = (response + 1), color = "Response", shape = "Response"), size = 2) +
-  geom_point(aes(y = (no.response + 1), color = "No response", shape = "No response"), size = 2) +
-  geom_smooth(aes(y = (no.response + 1), color = "No response"), se = FALSE) +
-  geom_smooth(aes(y = (response + 1), color = "Response"), se = FALSE) +
-  scale_colour_manual("", values = c("#1aafd4", "#D43F1A")) +
-  scale_shape_manual("", values = c(17, 16)) +
-  scale_x_date(date_breaks = "2 years",
-               date_labels = "%y") +
-  scale_y_log10() +
-  theme_bw() +
-  theme(axis.ticks = element_blank(),
-        plot.title = element_text(size = 18),
-        axis.text = element_text(size = 15),
-        axis.title = element_text(size = 18),
-        strip.text = element_text(size = 18),
-        legend.text = element_text(size = 18),
-        legend.position = c(1, 0),
-        legend.justification = c(1, 0),
-        legend.direction = "horizontal",
-        legend.box.background = element_rect(colour = "black", size = 2),
-        legend.key.size = unit(2, "line")) +
-  labs(color  = "Guide name", shape = "Guide name") +
-  xlab("Year") + ylab("Count (log)") + labs(title = "Responsiveness on Twitter per 6 months")
-
-#           Consequences
-# ======================================================
-sentiment <- vader_df(response2$text,
-                            incl_nt = T,
-                            neu_set = T,
-                            rm_qm = T) # Calculate valence of tweets
-
-sentiment.data <- merge(sentiment,
-                      response2,
-                      by.y = "text",
-                      by.x = "text") %>% # Merge scores with data
-  distinct() %>% 
-  mutate(sentiment = case_when(
-    compound <= -0.05 ~ "twitter.criticism",
-    compound > -0.05 & compound < 0.05 ~ "twitter.neutral",
-    compound >= 0.05 ~ "twitter.praise")) 
-
-# Distribution
-sentiment.data %>%
-  group_by(sentiment) %>%
+# Distribution of consequences
+response2 %>%
+  group_by(score) %>%
   dplyr::summarise(count = n())
 
+response2 %>% select(score) %>%
+  descr()
+
 # Consequences per day
-consequences.day <- sentiment.data %>%
+consequences <- response2 %>%
+  drop_na(score) %>%
+  mutate(score.chr = case_when(
+  # score == -1 ~ "min1", # No scores of -1 in dataset
+    score == -0.9 ~ "min09",
+    score == -0.8 ~ "min08",
+    score == -0.7 ~ "min07",
+    score == -0.6 ~ "min06",
+    score == -0.5 ~ "min05",
+    score == -0.4 ~ "min04",
+    score == -0.3 ~ "min03",
+    score == -0.2  ~ "min02",
+    score == -0.1 ~ "min01",
+    score == 0 ~ "neutral",
+    score == 0.1 ~ "plus01",
+    score == 0.2 ~ "plus02",
+    score == 0.3 ~ "plus03",
+    score == 0.4 ~ "plus04",
+    score == 0.5 ~ "plus05",
+    score == 0.6 ~ "plus06",
+    score == 0.7 ~ "plus07",
+    score == 0.8 ~ "plus08",
+    score == 0.9 ~ "plus09",
+  #  score == 1 ~ "plus1", # No scores of 1 in dataset
+    )) 
+
+consequences.day <- consequences %>%
   dplyr::group_by(agencyname, day = cut(day, "day"),  .drop = FALSE)  %>% 
-  dplyr::count(sentiment) %>%
-  pivot_wider(names_from = "sentiment",
+  dplyr::count(score.chr) %>%
+  pivot_wider(names_from = "score.chr",
               values_from = "n",
               values_fill = 0) %>% 
   dplyr::select(-`NA`) %>%
+<<<<<<< HEAD
+  mutate(day = as.POSIXct(day))
+=======
   mutate(day = as.POSIXct(day, format = "%Y-%m-%d"))
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 # Consequences per week
-consequences.week <- sentiment.data %>%
+consequences.week <- consequences %>%
   dplyr::group_by(agencyname, week = cut(day, "week"),  .drop = FALSE)  %>% 
-  dplyr::count(sentiment) %>%
-  pivot_wider(names_from = "sentiment",
+  dplyr::count(score.chr) %>%
+  pivot_wider(names_from = "score.chr",
               values_from = "n",
               values_fill = 0) %>% 
   dplyr::select(-`NA`) %>%
+<<<<<<< HEAD
+  mutate(week = as.POSIXct(week),
+=======
   mutate(week = as.POSIXct(week, format = "%Y-%m-%d"),
+<<<<<<< HEAD
+         twitter.index = 0.9*plus09 +
+                         0.8*plus08 +
+                         0.7*plus07 +
+                         0.6*plus06 +
+                         0.5*plus05 +
+                         0.4*plus04 +
+                         0.3*plus03 +
+                         0.2*plus02 +
+                         0.1*plus01 -
+                         0.1*min01 -
+                         0.2*min02 -
+                         0.3*min03 -
+                         0.4*min04 -
+                         0.5*min05 -
+                         0.6*min06 -
+                         0.7*min07 -
+                         0.8*min08 -
+                         0.9*min09)
+=======
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
          twitter.index = twitter.praise - twitter.criticism)
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
 
 # ======================================================
 #           Joining dataframes: tweet-level
@@ -567,7 +658,14 @@ consequences.week <- sentiment.data %>%
 twitter.day <- information.day %>% 
   full_join(consequences.day,  by = c("agencyname", "day")) %>%
   full_join(media.day, by = c("agencyname", "day")) %>%
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+  full_join(media.sentiment.day,  by = c("agencyname", "day")) %>%
+=======
  # full_join(media.sentiment.day,  by = c("agencyname", "day")) %>%
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   full_join(responsiveness.day,  by = c("agencyname", "day")) %>%
   full_join(joining.date, by = "agencyname") %>%
   mutate_if(is.numeric, tidyr::replace_na, replace = 0) %>% 
@@ -575,10 +673,7 @@ twitter.day <- information.day %>%
 # Twitter vars to NA if agency wasn't on Twitter
   mutate_at(.vars = c("information",
                       "comments.count",
-                      "responses.count",
-                      "twitter.praise",
-                      "twitter.neutral",
-                      "twitter.criticism"),
+                      "responses.count"),
             funs(ifelse(day < join.day, NA, .)))
 
 #           Rolling sum/lags
@@ -609,23 +704,52 @@ twitter.day.lag <- twitter.day %>%
     
     # Valence on Twitter
     # Valence on Twitter in past week
-    twitter.criticism.1w = rollapplyr(twitter.criticism, list(seq(-7, -1)), sum, fill = NA, align = "right"),
-    twitter.praise.1w = rollapplyr(twitter.praise, list(seq(-7, -1)), sum, fill = NA, align = "right"),
-    twitter.neutral.1w = rollapplyr(twitter.neutral, list(seq(-7, -1)), sum, fill = NA, align = "right"),
-    twitter.valence.1w = ifelse(!(twitter.praise.1w + twitter.neutral.1w + twitter.criticism.1w), 0, (twitter.praise.1w - twitter.criticism.1w) / (twitter.praise.1w + twitter.neutral.1w + twitter.criticism.1w)),
+    min09.1w = rollapplyr(min09, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    min08.1w = rollapplyr(min08, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    min07.1w = rollapplyr(min07, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    min06.1w = rollapplyr(min06, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    min05.1w = rollapplyr(min05, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    min04.1w = rollapplyr(min04, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    min03.1w = rollapplyr(min03, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    min02.1w = rollapplyr(min02, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    min01.1w = rollapplyr(min01, list(seq(-7, -1)), sum, fill = NA, align = "right"),
     
-    # Meijer and Kleinnijenhuis index (1 week): pos - neg
-    twitter.index.1w = twitter.praise.1w - twitter.criticism.1w,
+    neutral.1w = rollapplyr(neutral, list(seq(-7, -1)), sum, fill = NA, align = "right"),
     
-        # Valence on Twitter in past 30 days
-    twitter.criticism.30d = rollapplyr(twitter.criticism, list(seq(-30, -1)), sum, fill = NA, align = "right"),
-    twitter.praise.30d = rollapplyr(twitter.praise, list(seq(-30, -1)), sum, fill = NA, align = "right"),
-    twitter.neutral.30d = rollapplyr(twitter.neutral, list(seq(-30, -1)), sum, fill = NA, align = "right"),
-    twitter.valence.30d = ifelse(!(twitter.praise.30d + twitter.neutral.30d + twitter.criticism.30d), 0, (twitter.praise.30d - twitter.criticism.30d) / (twitter.praise.30d + twitter.neutral.30d + twitter.criticism.30d)),
+    plus09.1w = rollapplyr(plus09, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    plus08.1w = rollapplyr(plus08, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    plus07.1w = rollapplyr(plus07, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    plus06.1w = rollapplyr(plus06, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    plus05.1w = rollapplyr(plus05, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    plus04.1w = rollapplyr(plus04, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    plus03.1w = rollapplyr(plus03, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    plus02.1w = rollapplyr(plus02, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    plus01.1w = rollapplyr(plus01, list(seq(-7, -1)), sum, fill = NA, align = "right"),
     
-    # Meijer and Kleinnijenhuis index (30 days): pos - neg
-    twitter.index.30d = twitter.praise.30d - twitter.criticism.30d,
+    twitter.index.1w = 0.9*plus09.1w +
+                      0.8*plus08.1w +
+                      0.7*plus07.1w +
+                      0.6*plus06.1w +
+                      0.5*plus05.1w +
+                      0.4*plus04.1w +
+                      0.3*plus03.1w +
+                      0.2*plus02.1w +
+                      0.1*plus01.1w -
+                      0.1*min01.1w -
+                      0.2*min02.1w -
+                      0.3*min03.1w -
+                      0.4*min04.1w -
+                      0.5*min05.1w -
+                      0.6*min06.1w -
+                      0.7*min07.1w -
+                      0.8*min08.1w -
+                      0.9*min09.1w,
     
+<<<<<<< HEAD
+    twitter.valence.1w = ifelse(!(comments.1w),
+                                0,
+                                (twitter.index.1w) / (comments.1w)),
+=======
     # Valence on Twitter in past 90 days
     twitter.criticism.90d = rollapplyr(twitter.criticism, list(seq(-90, -1)), sum, fill = NA, align = "right"),
     twitter.praise.90d = rollapplyr(twitter.praise, list(seq(-90, -1)), sum, fill = NA, align = "right"),
@@ -646,6 +770,26 @@ twitter.day.lag <- twitter.day %>%
     
     # Media
     # Valence in media in past 30 days
+<<<<<<< HEAD
+    criticism.30d = rollapplyr(negative, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+    praise.30d = rollapplyr(positive, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+    neutral.30d = rollapplyr(neutral, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+    media.valence.30d = ifelse(!(praise.30d + neutral.30d + criticism.30d), 0, (praise.30d - criticism.30d) / (praise.30d + neutral.30d + criticism.30d)),
+    
+    # Valence in media in past 90 days
+    criticism.90d = rollapplyr(negative, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+    praise.90d = rollapplyr(positive, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+    neutral.90d = rollapplyr(neutral, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+    media.valence.90d = ifelse(!(praise.90d + neutral.90d + criticism.90d), 0, (praise.90d - criticism.90d) / (praise.90d + neutral.90d + criticism.90d)),
+    
+    # Valence in media in past 365 days
+    criticism.365d = rollapplyr(negative, list(seq(-365, -1)), sum, fill = NA, align = "right"),
+    praise.365d = rollapplyr(positive, list(seq(-365, -1)), sum, fill = NA, align = "right"),
+    neutral.365d = rollapplyr(neutral, list(seq(-365, -1)), sum, fill = NA, align = "right"),
+    media.valence.365d = ifelse(!(praise.365d + neutral.365d + criticism.365d), 0, (praise.365d - criticism.365d) / (praise.365d + neutral.365d + criticism.365d)),
+    
+    # Media count
+=======
    # criticism.30d = rollapplyr(negative, list(seq(-30, -1)), sum, fill = NA, align = "right"),
    # praise.30d = rollapplyr(positive, list(seq(-30, -1)), sum, fill = NA, align = "right"),
    # neutral.30d = rollapplyr(neutral, list(seq(-30, -1)), sum, fill = NA, align = "right"),
@@ -662,13 +806,30 @@ twitter.day.lag <- twitter.day %>%
    # praise.365d = rollapplyr(positive, list(seq(-365, -1)), sum, fill = NA, align = "right"),
    # neutral.365d = rollapplyr(neutral, list(seq(-365, -1)), sum, fill = NA, align = "right"),
    # media.valence.365d = ifelse(!(praise.365d + neutral.365d + criticism.365d), 0, (praise.365d - criticism.365d) / (praise.365d + neutral.365d + criticism.365d)),
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
     
     # Media count (source)
     media.count.1w = rollapplyr(media.source, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
     media.count.30d = rollapplyr(media.source, list(seq(-30, -1)), sum, fill = NA, align = "right"),
     media.count.90d = rollapplyr(media.source, list(seq(-90, -1)), sum, fill = NA, align = "right"),
     media.count.365d = rollapplyr(media.source, list(seq(-365, -1)), sum, fill = NA, align = "right"),
     
+<<<<<<< HEAD
+    # Information
+    information.1w = rollapplyr(information, list(seq(-7, -1)), sum, fill = NA, align = "right"),
+    information.30d = rollapplyr(information, list(seq(-30, -1)), sum, fill = NA, align = "right"),
+    information.90d = rollapplyr(information, list(seq(-90, -1)), sum, fill = NA, align = "right"),
+    information.365d = rollapplyr(information, list(seq(-365, -1)), sum, fill = NA, align = "right"))
+
+# Select variable and merge with lagged data
+response.tweet <- sentiment.data %>%
+  dplyr::select(tweet_id, conversation_id, day, agencyname, response, short, weekend,
+         response, qm.comment, attachment, real.time, year, month, sentiment, referenced_id,
+         time.on.Twitter, mention, qm.agency, conversations, url, same.message) %>%
+  left_join(twitter.day.lag, by = c("agencyname", 'day')) %>%
+  filter(time.on.Twitter >= 0)
+=======
    # Media count (begin)
    media.begin.1w = rollapplyr(media.begin, list(seq(-7, -1)), sum, fill = NA, align = "right"),
    media.begin.30d = rollapplyr(media.begin, list(seq(-30, -1)), sum, fill = NA, align = "right"),
@@ -676,13 +837,14 @@ twitter.day.lag <- twitter.day %>%
    media.begin.365d = rollapplyr(media.begin, list(seq(-365, -1)), sum, fill = NA, align = "right"))
    
 # Select variable and merge with lagged data
-response.tweet <- sentiment.data %>%
-  dplyr::select(tweet_id, conversation_id, day, agencyname, response, short, weekend,
-         qm.comment, attachment, real.time, year, sentiment, referenced_id,
-         time.on.Twitter, mention, qm.agency, conversations, url, same.message, uncivil.tweet, office.hours) %>%
+response.tweet <- response2 %>%
+  dplyr::select(tweet_id, conversation_id, day, agencyname, response, short, weekend, retweet_count, like_count,
+         qm.comment, attachment, real.time, year, score, referenced_id, 
+         time.on.Twitter, mention, qm.agency, conversations, url, same.message, uncivil.tweet, office.hours, weighted.score) %>%
   left_join(twitter.day.lag, by = c("agencyname", 'day')) %>%
   filter(time.on.Twitter >= 0) %>%
   ungroup()
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 # ======================================================
 #           Joining dataframes: agency-week panel
@@ -691,8 +853,21 @@ response.tweet <- sentiment.data %>%
 # Join dataframes with weekly data
 twitter.week <- information.week %>%
   full_join(consequences.week, by = c("agencyname", "week")) %>%
+  full_join(consequences.week, by = c("agencyname", "week")) %>%
+  
   full_join(media.week, by = c("agencyname", "week")) %>%
+<<<<<<< HEAD
+  full_join(joining.date, by = "agencyname")
+
+#           Putting it all together
+# ======================================================
+response.panel <- response2 %>%
+=======
+<<<<<<< HEAD
+  full_join(media.sentiment.week,  by = c("agencyname", "week")) %>%
+=======
  # full_join(media.sentiment.week,  by = c("agencyname", "week")) %>%
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
   full_join(joining.date, by = "agencyname")
 
 #           From agency variables
@@ -705,49 +880,73 @@ agency.week <- engaging %>%
   dplyr::summarize(mention.week = sum(mention),
             qm.agency.week = sum(qm.agency),
             no.of.tweets = n()) %>%
+<<<<<<< HEAD
+  mutate(week = as.POSIXct(week),
+=======
   mutate(week = as.POSIXct(week, format = "%Y-%m-%d"),
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
          mention.ratio = ifelse(!(no.of.tweets), 0, (mention.week/no.of.tweets)),
          qm.agency.ratio = ifelse(!(no.of.tweets), 0, (qm.agency.week/no.of.tweets)))
 
 #           Putting it all together
 # ======================================================
 response.panel <- sentiment.data %>%
+<<<<<<< HEAD
+  filter(same.message == 0) %>% # Remove 'same message' tweets
+=======
  # filter(same.message == 0) %>% # Remove 'same message' tweets?
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   group_by(agencyname,
            week = cut(day, "week"),
            .drop = FALSE) %>%
   dplyr::summarise(offset.week = n(),
+<<<<<<< HEAD
+                   response.week = sum(response))  %>%
+  mutate(week = as.POSIXct(week, format = "%Y-%m-%d")) %>%
+=======
             response.week = sum(response),
             same.message.week = sum(same.message),
             attachment.week = sum(attachment),
             qm.comment.week = sum(qm.comment),
             weekend.week = sum(weekend),
             short.week = sum(short))  %>%
+<<<<<<< HEAD
+  mutate(week = as.POSIXct(week),
+=======
   mutate(week = as.POSIXct(week, format = "%Y-%m-%d"),
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
          attachment.ratio = ifelse(!(offset.week), 0, (attachment.week/offset.week)),
          same.message.ratio = ifelse(!(offset.week), 0, (same.message.week/offset.week)),
          qm.comment.ratio = ifelse(!(offset.week), 0, (qm.comment.week/offset.week)),
          short.ratio = ifelse(!(offset.week), 0, (short.week/offset.week)),
          weekend.ratio =  ifelse(!(offset.week), 0, (weekend.week/offset.week))) %>%
+>>>>>>> 104e69cb0f93ba3ce91fb8f612ba1da49938b05c
   left_join(twitter.week, by = c("agencyname", 'week')) %>% 
-  left_join(agency.week, by = c("agencyname", 'week')) %>% 
   mutate(time.on.Twitter = difftime(strptime(week, format = "%Y-%m-%d"),
                              strptime(join.day, format = "%Y-%m-%d"), units = c("weeks")) %>% as.numeric(),
+<<<<<<< HEAD
+         real.time = difftime(strptime(created_at, format = "%Y-%m-%d"),
+                              strptime(start, format = "%Y-%m-%d"), # See above
+                              units = c("days")),
+         twitter.index = twitter.praise - twitter.criticism,
+         media.valence = ifelse(!(positive + neutral + negative), 0, (positive - negative) / (positive + neutral + negative))) %>%
+  filter(time.on.Twitter >= 0)
+=======
          real.time = difftime(strptime(week, format = "%Y-%m-%d"),
                               strptime(start, format = "%Y-%m-%d"), # See above
                               units = c("days")),
-         twitter.index = twitter.praise - twitter.criticism) %>%
+         twitter.valence = ifelse(!(offset.week),
+                                  0,
+                                  (twitter.index) / (offset.week))) %>%
   arrange(week) %>%
   group_by(agencyname) %>% # Lag by one week
-  mutate(twitter.criticism.1w = rollapplyr(twitter.criticism, list(seq(-1, -1)), sum, fill = NA, align = "right"),
-       twitter.praise.1w = rollapplyr(twitter.praise, list(seq(-1, -1)), sum, fill = NA, align = "right"),
-       twitter.neutral.1w = rollapplyr(twitter.neutral, list(seq(-1, -1)), sum, fill = NA, align = "right"),
-       twitter.valence1 = ifelse(!(twitter.praise.1w + twitter.neutral.1w + twitter.criticism.1w), 0, (twitter.praise.1w - twitter.criticism.1w) / (twitter.praise.1w + twitter.neutral.1w + twitter.criticism.1w)),
-
-       twitter.index1 = rollapplyr(twitter.index, list(seq(-1, -1)), sum, fill = NA, align = "right"),
-       media.source1 = rollapplyr(media.source, list(seq(-1, -1)), sum, fill = NA, align = "right"),
-       media.begin1 = rollapplyr(media.begin, list(seq(-1, -1)), sum, fill = NA, align = "right")) %>%
+  mutate(twitter.index1 = rollapplyr(twitter.index, list(seq(-1, -1)), sum, fill = NA, align = "right"),
+         twitter.valence1 = rollapplyr(twitter.valence, list(seq(-1, -1)), sum, fill = NA, align = "right"),
+         media.source1 = rollapplyr(media.source, list(seq(-1, -1)), sum, fill = NA, align = "right"),
+         media.begin1 = rollapplyr(media.begin, list(seq(-1, -1)), sum, fill = NA, align = "right")) %>%
         filter(time.on.Twitter >= 0)
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e
 
 #           A look at the distribution
 # ======================================================
@@ -759,5 +958,10 @@ response.panel %>%
 # ======================================================
 #          save data
 # ======================================================
+<<<<<<< HEAD
+save(response.tweet, file = "response_tweet.Rda")
+save(response.panel, file = "response_panel.Rda")
+=======
 save(response.tweet, file = "response_tweet2.Rda")
 save(response.panel, file = "response_panel2.Rda")
+>>>>>>> c8cc2f359ba27695940a8b499455dcd5f78c029e

@@ -30,7 +30,7 @@ tibble.from.time <-  df %>%
   distinct(tweet_id, .keep_all = TRUE) %>%
   rename(referenced_id = id,
   referenced_type = type) %>% # Unnesting referenced tweets
-  mutate(referenced_type = replace_na(referenced_type, "no reference")) %>%
+  mutate(referenced_type = tidyr::replace_na(referenced_type, "no reference")) %>%
   dplyr::select(tweet_id, created_at)
 
 # Tweets
@@ -44,7 +44,7 @@ tibble.from %>%
   group_by(referenced_type) %>% 
   dplyr::summarise(count = n()) # Count
 
-save(tibble.from, file = "from_tweets_3a")
+save(tibble.from, file = "from_tweets_3a.Rdata")
 
 # ======================================================
 #           Replies to agencies
@@ -78,10 +78,10 @@ tibble.to.time <-  df.to %>%
 
 load(file = "./data (not public)/to_tweets/tweetsTO_final.RData")
 
-tibble.from <- tweetsTO_final %>%
+tibble.to <- tweetsTO_final %>%
   select(-created_at) %>%
   left_join(tibble.to.time, by = "tweet_id")
 
-save(tibble.from, file = "allreplies_5a")
+save(tibble.to, file = "allreplies_5a.Rdata")
 
 

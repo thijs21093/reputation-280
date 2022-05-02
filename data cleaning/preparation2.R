@@ -374,7 +374,7 @@ response.tweet <- response2 %>%
                 score, magnitude, weighted.score, # Sentiment
                 short, weekend, retweet_count, like_count, qm.comment, attachment, year, conversations, same.message, uncivil.tweet, office.hours, # user reply controls
                 qm.agency, mention, # Agency controls (with missing)
-                date.time) %>% # Serial autocorrelation
+                date.time, join.day) %>% # Serial autocorrelation
   filter(time.on.Twitter >= 0)
 
 # ======================================================

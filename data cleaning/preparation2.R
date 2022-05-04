@@ -21,9 +21,9 @@ load(file = "./data (not public)/from_tweets/from_tweets_3a.RData")
 load(file = "./data (not public)/to_tweets/allreplies_5a.RData")
 
 # Media count
-load("./data (not public)/media - outputs/media_week2_new.Rdata")
+load("./data (not public)/anomaly/media_anomaly.Rdata")
 
-media.week2 <- media.week2 %>%
+media.anomaly2 <- media.anomaly2 %>%
   dplyr::rename(agencyname = acronym) 
 
 # ======================================================
@@ -367,12 +367,12 @@ response2 %>%
 #           Joining dataframes: tweet-level
 # ======================================================
 response.tweet <- response2 %>%
-  full_join(media.week2, by = c("agencyname", "week.start" = "week")) %>%
+  left_join(media.anomaly2, by = c("agencyname", "day" = "day")) %>%
   dplyr::select(tweet_id, conversation_id, day, agencyname, referenced_id, url, time.on.Twitter, # General info
                 response, response.comment, # DVs
-                anomaly7, media, # Anomaly
+                anomaly.cencor, # Anomaly
                 score, magnitude, weighted.score, # Sentiment
-                short, weekend, retweet_count, like_count, qm.comment, attachment, year, conversations, same.message, uncivil.tweet, office.hours, # user reply controls
+                short, weekend, like_count, qm.comment, attachment, year, conversations, same.message, uncivil.tweet, office.hours, # user reply controls
                 qm.agency, mention, # Agency controls (with missing)
                 date.time, join.day) %>% # Serial autocorrelation
   filter(time.on.Twitter >= 0)
@@ -434,6 +434,6 @@ ggplot(response.tweet, aes(x = weighted.score)) +
 #          Media storm     
 # ======================================================
 response.tweet %>%
-  group_by(anomaly7) %>%
+  group_by(anomaly.cencor) %>%
   dplyr::summarise(count = n()) %>%
   mutate(freq = count / sum(count)) 
